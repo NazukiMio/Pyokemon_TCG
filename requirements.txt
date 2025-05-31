@@ -1,18 +1,14 @@
-# 宝可梦卡牌游戏项目依赖
-
 # 核心依赖
-pygame==2.5.2         # 游戏引擎
-requests==2.31.0      # HTTP客户端，用于访问PokeAPI
-pysqlite3==0.5.1      # SQLite数据库支持（如果系统Python内置sqlite3不够新）
+# pygame>=2.0.0
+pygame-gui
 
-# 图像处理
-Pillow==10.0.1        # 图像处理库，用于处理和操作图像
+# 可选依赖（视频背景支持）
+opencv-python
 
-# 可选依赖
-python-dotenv==1.0.0  # 环境变量管理，用于配置
-aiohttp==3.8.5        # 异步HTTP客户端，可用于并行请求PokeAPI
-cachetools==5.3.1     # 实现缓存，减少API调用
+# 开发依赖
+pytest
+black
+flake8
 
-# 开发工具
-pytest==7.4.0         # 测试框架（可选）
-black==23.7.0         # 代码格式化工具（可选）
+# 文档生成
+sphinx

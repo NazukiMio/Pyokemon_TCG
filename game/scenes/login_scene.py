@@ -1,17 +1,27 @@
+"""
+重构后的现代化登录场景
+使用组件化设计和统一样式
+"""
+
 import pygame
-import pygame.freetype
+import pygame_gui
 import sys
 import os
 
 # 导入核心模块
-from game.core.auth_manager import AuthManager
+from game.core.auth.auth_manager import AuthManager
+from game.scenes.components.button_component import ModernButton
+from game.scenes.components.input_component import ModernInput
+from game.scenes.components.message_component import MessageManager, ToastMessage
+# from game.scenes.animations.transitions import FadeTransition
+from game.scenes.styles.theme import Theme
+from game.scenes.styles.fonts import font_manager
+from game.utils.video_background import VideoBackground
 
 class LoginScene:
-    """
-    登录场景类，处理用户登录界面和逻辑
-    """
+    """现代化登录场景类，使用统一的组件系统"""
     
-    def __init__(self, screen, callback=None):
+    def __init__(self, screen, callback=None,):
         """
         初始化登录场景
         
@@ -21,359 +31,429 @@ class LoginScene:
         """
         self.screen = screen
         self.callback = callback
-        self.auth_manager = AuthManager()
+        from game.core.auth.auth_manager import get_auth_manager
+        self.auth_manager = get_auth_manager()
         
-        # 颜色定义
-        self.colors = {
-            'background': (30, 30, 60),
-            'button': (86, 62, 139),
-            'button_hover': (106, 82, 159),
-            'button_text': (255, 255, 255),
-            'input_bg': (255, 255, 255, 220),
-            'input_text': (20, 20, 20),
-            'error': (255, 80, 80),
-            'success': (80, 255, 80),
-            'title': (255, 255, 255),
-            'link': (150, 150, 255),
-            'link_hover': (200, 200, 255)
-        }
+        # 缩放因子
+        self.scale_factor = min(screen.get_width() / 1920, screen.get_height() / 1080)
         
-        # 加载字体
-        self.fonts = self.load_fonts()
+        # 初始化pygame-gui
+        self.ui_manager = pygame_gui.UIManager(screen.get_size())
+        self.setup_ui_theme()
         
-        # 输入框和按钮状态
-        self.input_boxes = {
-            'username': pygame.Rect(0, 0, 300, 50),
-            'password': pygame.Rect(0, 0, 300, 50)
-        }
-        self.buttons = {
-            'login': pygame.Rect(0, 0, 200, 60),
-            'register_link': pygame.Rect(0, 0, 200, 40)
-        }
+        # 组件管理器
+        self.message_manager = MessageManager()
+        # self.transition_manager = FadeTransition(screen)
         
-        # 动态调整UI元素位置
-        self.adjust_ui_positions()
+        # UI组件
+        self.inputs = {}
+        self.buttons = {}
+        self.toast_message = None
         
-        # 输入框状态
-        self.active_input = None
-        self.username = ""
-        self.password = ""
-        self.show_password = False
+        # 背景
+        self.background_surface = None
+        self.video_background = None
+        self.setup_background()
         
-        # 按钮悬停状态
-        self.button_hover = None
-        
-        # 消息状态
-        self.message = None
-        self.message_type = None  # 'error' 或 'success'
-        
-        # 注册链接状态
-        self.register_link_hover = False
-        
-        # 创建返回键盘事件的字典
-        self.key_handlers = {
-            pygame.K_RETURN: self.handle_return,
-            pygame.K_BACKSPACE: self.handle_backspace,
-            pygame.K_TAB: self.handle_tab
-        }
-        
-        # 加载背景图（如果有）
-        self.background = None
-        try:
-            bg_path = os.path.join("assets", "images", "backgrounds", "login_bg.jpg")
-            self.background = pygame.image.load(bg_path)
-            self.background = pygame.transform.scale(self.background, screen.get_size())
-        except Exception as e:
-            print(f"无法加载背景图: {e}")
-            
-        # 加载Logo（如果有）
+        # Logo
         self.logo = None
+        self.load_logo()
+        
+        # 设置UI元素
+        self.setup_ui_elements()
+        
+        # # 开始淡入动画
+        # self.transition_manager.start_fade_in()
+
+        # # 使用传入的转换管理器，如果没有就创建自己的
+        # if transition_manager:
+        #     self.transition_manager = transition_manager
+        #     print("🔗 使用共享转换管理器")
+        # else:
+        #     self.transition_manager = FadeTransition(screen)
+        #     print("🆕 创建新的转换管理器")
+
+    def setup_ui_theme(self):
+        """设置现代UI主题"""
+        self.ui_manager.get_theme().load_theme(Theme.UI_THEME_DATA)
+    
+    def setup_background(self):
+        """设置背景效果"""
+        try:
+            # 尝试加载视频背景
+            video_path = "assets/videos/bg.mp4"
+            if os.path.exists(video_path):
+                self.video_background = VideoBackground(video_path, self.screen.get_size())
+                print("✅ 视频背景加载成功")
+            else:
+                print("⚠️ 视频背景文件不存在，使用渐变背景")
+                self.create_gradient_background()
+        except Exception as e:
+            print(f"⚠️ 视频背景加载失败: {e}")
+            self.create_gradient_background()
+    
+    def create_gradient_background(self):
+        """创建渐变背景"""
+        width, height = self.screen.get_size()
+        self.background_surface = pygame.Surface((width, height))
+        
+        # 创建垂直渐变
+        start_color = Theme.get_color('background_gradient_start')
+        end_color = Theme.get_color('background_gradient_end')
+        
+        for y in range(height):
+            progress = y / height
+            r = int(start_color[0] + (end_color[0] - start_color[0]) * progress)
+            g = int(start_color[1] + (end_color[1] - start_color[1]) * progress)
+            b = int(start_color[2] + (end_color[2] - start_color[2]) * progress)
+            pygame.draw.line(self.background_surface, (r, g, b), (0, y), (width, y))
+    
+    def load_logo(self):
+        """加载Logo"""
         try:
             logo_path = os.path.join("assets", "images", "logo", "game_logo.png")
-            self.logo = pygame.image.load(logo_path)
-            logo_width = self.screen.get_width() * 0.4
-            logo_height = logo_width * (self.logo.get_height() / self.logo.get_width())
-            self.logo = pygame.transform.scale(self.logo, (int(logo_width), int(logo_height)))
-            self.logo_rect = self.logo.get_rect(center=(self.screen.get_width() // 2, self.screen.get_height() * 0.2))
+            if os.path.exists(logo_path):
+                self.logo = pygame.image.load(logo_path)
+                # 调整Logo大小
+                logo_width = int(self.screen.get_width() * 0.25)
+                logo_height = int(logo_width * (self.logo.get_height() / self.logo.get_width()))
+                self.logo = pygame.transform.smoothscale(self.logo, (logo_width, logo_height))
+                print("✅ Logo加载成功")
         except Exception as e:
-            print(f"无法加载Logo: {e}")
+            print(f"⚠️ Logo加载失败: {e}")
     
-    def load_fonts(self):
-        """加载字体"""
-        fonts = {}
-        try:
-            font_path = os.path.join("assets", "fonts", "power-clear.ttf")
-            # 如果字体文件存在，使用它
-            if os.path.exists(font_path):
-                fonts['title'] = pygame.font.Font(font_path, 40)
-                fonts['input'] = pygame.font.Font(font_path, 24)
-                fonts['button'] = pygame.font.Font(font_path, 28)
-                fonts['message'] = pygame.font.Font(font_path, 22)
-                fonts['link'] = pygame.font.Font(font_path, 20)
-            else:
-                # 否则使用系统字体
-                fonts['title'] = pygame.font.SysFont("arial", 40, bold=True)
-                fonts['input'] = pygame.font.SysFont("arial", 24)
-                fonts['button'] = pygame.font.SysFont("arial", 28, bold=True)
-                fonts['message'] = pygame.font.SysFont("arial", 22)
-                fonts['link'] = pygame.font.SysFont("arial", 20)
-        except Exception as e:
-            print(f"加载字体出错: {e}")
-            # 使用系统字体作为后备
-            fonts['title'] = pygame.font.SysFont("arial", 40, bold=True)
-            fonts['input'] = pygame.font.SysFont("arial", 24)
-            fonts['button'] = pygame.font.SysFont("arial", 28, bold=True)
-            fonts['message'] = pygame.font.SysFont("arial", 22)
-            fonts['link'] = pygame.font.SysFont("arial", 20)
+    def setup_ui_elements(self):
+        """设置UI元素"""
+        screen_width, screen_height = self.screen.get_size()
         
-        return fonts
-    
-    def adjust_ui_positions(self):
-        """根据屏幕尺寸调整UI元素位置"""
-        w, h = self.screen.get_size()
+        # 计算居中位置
+        form_width = int(min(450 * self.scale_factor, screen_width * 0.8))
+        center_x = screen_width // 2
+        start_y = int(screen_height * 0.4)
         
-        # 居中输入框
-        center_x = w // 2
-        username_y = int(h * 0.4)
-        password_y = username_y + 80
+        # 创建输入框
+        username_rect = pygame.Rect(center_x - form_width // 2, start_y, form_width, 
+                                   Theme.get_scaled_size('input_height', self.scale_factor))
+        self.inputs['username'] = ModernInput(
+            username_rect, 
+            placeholder="Nombre de usuario",
+            label="Nombre de usuario",
+            ui_manager=self.ui_manager
+        )
         
-        # 输入框位置和大小
-        input_width = min(400, int(w * 0.8))
-        self.input_boxes['username'].width = input_width
-        self.input_boxes['username'].height = 50
-        self.input_boxes['username'].center = (center_x, username_y)
+        password_rect = pygame.Rect(center_x - form_width // 2, start_y + 80, form_width,
+                                   Theme.get_scaled_size('input_height', self.scale_factor))
+        self.inputs['password'] = ModernInput(
+            password_rect,
+            placeholder="Contraseña",
+            label="Contraseña", 
+            is_password=True,
+            ui_manager=self.ui_manager
+        )
         
-        self.input_boxes['password'].width = input_width
-        self.input_boxes['password'].height = 50
-        self.input_boxes['password'].center = (center_x, password_y)
+        # 创建按钮
+        button_width = int(form_width * 0.8)
+        login_rect = pygame.Rect(center_x - button_width // 2, start_y + 160, button_width, 
+                                Theme.get_scaled_size('button_height_large', self.scale_factor))
+        self.buttons['login'] = ModernButton(
+            login_rect,
+            text="INICIAR SESIÓN",
+            icon="",
+            button_type="primary",
+            font_size="lg"
+        )
         
-        # 登录按钮位置和大小
-        button_width = min(300, int(w * 0.6))
-        self.buttons['login'].width = button_width
-        self.buttons['login'].height = 60
-        self.buttons['login'].center = (center_x, password_y + 100)
-        
-        # 注册链接位置
-        self.buttons['register_link'].width = 200
-        self.buttons['register_link'].height = 40
-        self.buttons['register_link'].center = (center_x, password_y + 170)
+        register_rect = pygame.Rect(center_x - button_width // 2, start_y + 240, button_width, 30)
+        self.buttons['register'] = ModernButton(
+            register_rect,
+            text="¿No tienes cuenta? Crear nueva cuenta",
+            button_type="text",
+            font_size="md"
+        )
     
     def handle_event(self, event):
-        """
-        处理pygame事件
-        
-        Args:
-            event: pygame事件对象
-        
-        Returns:
-            布尔值表示是否继续运行场景
-        """
+        """处理事件"""
         if event.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
         
         elif event.type == pygame.VIDEORESIZE:
-            # 窗口大小改变时调整UI
-            self.adjust_ui_positions()
-        
-        elif event.type == pygame.MOUSEBUTTONDOWN:
-            # 检查点击的位置
-            return self.handle_mouse_click(event.pos)
+            self.handle_resize(event.size)
         
         elif event.type == pygame.MOUSEMOTION:
-            # 更新悬停状态
-            self.update_hover_states(event.pos)
+            # 更新按钮悬停状态
+            for button in self.buttons.values():
+                button.update_hover(event.pos)
         
-        elif event.type == pygame.KEYDOWN:
-            # 处理键盘输入
-            if event.key in self.key_handlers:
-                self.key_handlers[event.key]()
-            elif self.active_input:
-                self.handle_text_input(event)
+        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
+            self.handle_mouse_click(event.pos)
         
-        return True
-    
-    def handle_mouse_click(self, pos):
-        """处理鼠标点击事件"""
-        # 检查输入框点击
-        for input_name, input_rect in self.input_boxes.items():
-            if input_rect.collidepoint(pos):
-                self.active_input = input_name
-                return True
+        # 处理输入框事件
+        # for input_comp in self.inputs.values():
+        #     input_comp.handle_event(event)
         
-        # 点击其他地方时取消输入框焦点
-        self.active_input = None
-        
-        # 检查登录按钮点击
-        if self.buttons['login'].collidepoint(pos):
-            success, message = self.auth_manager.login(self.username, self.password)
-            self.message = message
-            self.message_type = 'success' if success else 'error'
-            
-            if success and self.callback:
-                # 登录成功，调用回调函数
-                self.callback(self.auth_manager.get_current_user_id())
-                return False  # 不再继续此场景
-            
-            return True
-        
-        # 检查注册链接点击
-        if self.buttons['register_link'].collidepoint(pos):
-            # 切换到注册场景（通过回调函数）
-            if self.callback:
-                self.callback("register")
-                return False  # 不再继续此场景
+        # 处理pygame-gui事件
+        self.ui_manager.process_events(event)
         
         return True
     
-    def update_hover_states(self, pos):
-        """更新按钮和链接的悬停状态"""
-        # 检查登录按钮悬停
-        self.button_hover = self.buttons['login'].collidepoint(pos)
+    def handle_resize(self, new_size):
+        """处理窗口大小变化"""
+        self.screen = pygame.display.set_mode(new_size, pygame.RESIZABLE)
+        self.ui_manager.set_window_resolution(new_size)
+        self.scale_factor = min(new_size[0] / 1920, new_size[1] / 1080)
         
-        # 检查注册链接悬停
-        self.register_link_hover = self.buttons['register_link'].collidepoint(pos)
-    
-    def handle_text_input(self, event):
-        """处理文本输入"""
-        # 忽略不可打印的字符
-        if event.unicode.isprintable():
-            if self.active_input == 'username':
-                self.username += event.unicode
-            elif self.active_input == 'password':
-                self.password += event.unicode
-    
-    def handle_return(self):
-        """处理回车键"""
-        if self.active_input == 'username':
-            # 从用户名移动到密码输入框
-            self.active_input = 'password'
-        elif self.active_input == 'password':
-            # 触发登录操作
-            success, message = self.auth_manager.login(self.username, self.password)
-            self.message = message
-            self.message_type = 'success' if success else 'error'
-            
-            if success and self.callback:
-                # 登录成功，调用回调函数
-                self.callback(self.auth_manager.get_current_user_id())
-                return False  # 不再继续此场景
-    
-    def handle_backspace(self):
-        """处理退格键"""
-        if self.active_input == 'username':
-            self.username = self.username[:-1]
-        elif self.active_input == 'password':
-            self.password = self.password[:-1]
-    
-    def handle_tab(self):
-        """处理Tab键切换输入框"""
-        if self.active_input == 'username':
-            self.active_input = 'password'
-        elif self.active_input == 'password':
-            self.active_input = 'username'
+        # 重新创建背景
+        if not self.video_background:
+            self.create_gradient_background()
         else:
-            self.active_input = 'username'
+            self.video_background.update_size(new_size)
+        
+        # 重新设置UI元素
+        self.setup_ui_elements()
+        
+        # 重新加载Logo
+        if self.logo:
+            self.load_logo()
     
-    def draw_text_input(self, rect, text, active, is_password=False):
-        """绘制文本输入框"""
-        # 绘制输入框背景
-        pygame.draw.rect(self.screen, self.colors['input_bg'], rect, border_radius=10)
-        
-        # 如果输入框处于活动状态，绘制高亮边框
-        border_color = self.colors['button'] if active else (100, 100, 100)
-        pygame.draw.rect(self.screen, border_color, rect, 2, border_radius=10)
-        
-        # 处理密码遮蔽
-        display_text = text
-        if is_password and not self.show_password:
-            display_text = '*' * len(text)
-        
-        # 渲染文本
-        if text:
-            text_surface = self.fonts['input'].render(display_text, True, self.colors['input_text'])
-            # 将文本放置在输入框内，保持一定的内边距
-            text_rect = text_surface.get_rect(midleft=(rect.x + 15, rect.centery))
-            self.screen.blit(text_surface, text_rect)
+    def handle_mouse_click(self, mouse_pos):
+        """处理鼠标点击"""
+        # 检查按钮点击
+        if self.buttons['login'].is_clicked(mouse_pos, 1):
+            self.buttons['login'].trigger_flash()
+            self.handle_login()
+        elif self.buttons['register'].is_clicked(mouse_pos, 1):
+            self.buttons['register'].trigger_flash()
+            self.handle_register_switch()
     
-    def draw_button(self, rect, text, hover=False):
-        """绘制按钮"""
-        # 绘制按钮背景
-        color = self.colors['button_hover'] if hover else self.colors['button']
-        pygame.draw.rect(self.screen, color, rect, border_radius=15)
+    def handle_login(self):
+        """处理登录"""
+        username = self.inputs['username'].ui_element.get_text()
+        password = self.inputs['password'].ui_element.get_text()
         
-        # 绘制按钮文本
-        text_surface = self.fonts['button'].render(text, True, self.colors['button_text'])
-        text_rect = text_surface.get_rect(center=rect.center)
-        self.screen.blit(text_surface, text_rect)
+        # 清除之前的错误
+        for input_comp in self.inputs.values():
+            input_comp.clear_error()
+        
+        success, message = self.auth_manager.login(username, password)
+        
+        if success:
+            # 显示成功消息
+            self.toast_message = ToastMessage(message, "success", 1000)
+            # 保存用户ID（如果需要的话）
+            user_id = self.auth_manager.get_current_user_id()
+            print(f"✅ 用户 {user_id} 登录成功，进入游戏")
+            # 开始淡出转换到游戏主界面
+            if self.callback:
+                self.callback("game_main")
+        else:
+            # 显示错误消息
+            self.toast_message = ToastMessage(message, "error", 3000)
+            
+            # 根据错误类型设置输入框错误状态
+            if "usuario" in message.lower():
+                self.inputs['username'].set_error("Usuario incorrecto")
+            elif "contraseña" in message.lower():
+                self.inputs['password'].set_error("Contraseña incorrecta")
     
-    def draw_link(self, rect, text, hover=False):
-        """绘制链接文本"""
-        color = self.colors['link_hover'] if hover else self.colors['link']
-        text_surface = self.fonts['link'].render(text, True, color)
-        text_rect = text_surface.get_rect(center=rect.center)
-        self.screen.blit(text_surface, text_rect)
+    def handle_register_switch(self):
+        """切换到注册页面"""
+        print("🔄 切换到注册页面")
+        if self.callback:
+                self.callback("register")
+    
+    def update(self, dt):
+        """更新场景"""
+        # 删除转换管理器更新：
+        # if not self.transition_manager.update(dt):
+        #     return False
         
-        # 绘制下划线
-        start_pos = (text_rect.left, text_rect.bottom)
-        end_pos = (text_rect.right, text_rect.bottom)
-        pygame.draw.line(self.screen, color, start_pos, end_pos, 1)
+        # 更新pygame-gui
+        self.ui_manager.update(dt)
+
+        # 更新输入框
+        for input_field in self.inputs.values():
+            input_field.update(dt)
+        
+        # 更新按钮动画
+        for button in self.buttons.values():
+            button.update_animation(dt)
+        
+        # 更新消息管理器
+        self.message_manager.update(dt)
+        
+        # 更新Toast消息
+        if self.toast_message and not self.toast_message.update():
+            self.toast_message = None
+        
+        # 更新视频背景
+        if self.video_background:
+            self.video_background.update()
+        
+        return True
     
     def draw(self):
         """绘制场景"""
         # 绘制背景
-        if self.background:
-            self.screen.blit(self.background, (0, 0))
+        self.draw_background()
+        
+        # 绘制Logo和标题
+        self.draw_logo_and_title()
+        
+        # 绘制副标题
+        self.draw_subtitle()
+        
+        # 绘制输入框背景
+        for input_comp in self.inputs.values():
+            input_comp.draw_background(self.screen, self.scale_factor)
+        
+        # 绘制pygame-gui元素（输入框）
+        self.ui_manager.draw_ui(self.screen)
+        
+        # 绘制按钮
+        for button in self.buttons.values():
+            button.draw(self.screen, self.scale_factor)
+        
+        # 绘制消息
+        self.message_manager.draw(self.screen, self.scale_factor)
+        
+        # 绘制Toast消息
+        if self.toast_message:
+            screen_width, screen_height = self.screen.get_size()
+            self.toast_message.draw(self.screen, screen_width // 2, int(screen_height * 0.75), self.scale_factor)
+        
+        # 绘制转换效果
+        # self.transition_manager.draw()
+
+        # 绘制pygame-gui界面
+        self.ui_manager.draw_ui(self.screen)
+    
+    def draw_background(self):
+        """绘制背景"""
+        if self.video_background:
+            bg_surface = self.video_background.get_surface()
+            if bg_surface:
+                self.screen.blit(bg_surface, (0, 0))
+            else:
+                # 视频不可用时的后备背景
+                if self.background_surface:
+                    self.screen.blit(self.background_surface, (0, 0))
+                else:
+                    self.screen.fill(Theme.get_color('background'))
         else:
-            self.screen.fill(self.colors['background'])
+            if self.background_surface:
+                self.screen.blit(self.background_surface, (0, 0))
+            else:
+                self.screen.fill(Theme.get_color('background'))
+    
+    def draw_logo_and_title(self):
+        """绘制Logo和标题"""
+        screen_width, screen_height = self.screen.get_size()
         
-        # 绘制Logo
         if self.logo:
-            self.screen.blit(self.logo, self.logo_rect)
-        
-        # 绘制标题
-        if not self.logo:
-            title_surface = self.fonts['title'].render("Inicio de Sesión", True, self.colors['title'])
-            title_rect = title_surface.get_rect(center=(self.screen.get_width() // 2, self.screen.get_height() * 0.2))
+            logo_rect = self.logo.get_rect(center=(screen_width // 2, int(screen_height * 0.18)))
+            self.screen.blit(self.logo, logo_rect)
+        else:
+            # 文字标题作为后备
+            title_color = Theme.get_color('text_white')
+            title_surface = font_manager.render_text(
+                "Inicio de Sesión", '2xl', screen_height, title_color
+            )
+            title_rect = title_surface.get_rect(center=(screen_width // 2, int(screen_height * 0.18)))
             self.screen.blit(title_surface, title_rect)
+    
+    def draw_subtitle(self):
+        """绘制现代化副标题"""
+        screen_width, screen_height = self.screen.get_size()
         
-        # 绘制用户名标签
-        username_label = self.fonts['input'].render("Nombre de usuario:", True, self.colors['title'])
-        username_label_rect = username_label.get_rect(bottomleft=(self.input_boxes['username'].left, self.input_boxes['username'].top - 10))
-        self.screen.blit(username_label, username_label_rect)
+        # 副标题文字
+        subtitle_text = "Juego de Cartas Coleccionables"
+        text_color = Theme.get_color('text_white')
+        text_surface = font_manager.render_text(subtitle_text, 'md', screen_height, text_color)
         
-        # 绘制密码标签
-        password_label = self.fonts['input'].render("Contraseña:", True, self.colors['title'])
-        password_label_rect = password_label.get_rect(bottomleft=(self.input_boxes['password'].left, self.input_boxes['password'].top - 10))
-        self.screen.blit(password_label, password_label_rect)
+        # 位置
+        text_rect = text_surface.get_rect(center=(screen_width // 2, int(screen_height * 0.32)))
         
-        # 绘制输入框
-        self.draw_text_input(self.input_boxes['username'], self.username, self.active_input == 'username')
-        self.draw_text_input(self.input_boxes['password'], self.password, self.active_input == 'password', is_password=True)
+        # 现代化背景条
+        padding = Theme.get_scaled_size('spacing_lg', self.scale_factor)
+        bg_rect = text_rect.inflate(padding * 2, Theme.get_scaled_size('spacing_md', self.scale_factor))
         
-        # 绘制登录按钮
-        self.draw_button(self.buttons['login'], "Iniciar Sesión", self.button_hover)
+        # 绘制毛玻璃背景
+        self.draw_glass_background(bg_rect)
         
-        # 绘制注册链接
-        self.draw_link(self.buttons['register_link'], "Crear nueva cuenta", self.register_link_hover)
+        # 绘制文字
+        shadow_color = (100, 20, 20)
+        shadow_surface = font_manager.render_text(subtitle_text, 'md', screen_height, shadow_color)
+        self.screen.blit(shadow_surface, text_rect.move(2, 2))
+        self.screen.blit(text_surface, text_rect)
+    
+    def draw_glass_background(self, rect):
+        """绘制毛玻璃背景"""
+        radius = Theme.get_scaled_size('border_radius_medium', self.scale_factor)
         
-        # 绘制消息（如果有）
-        if self.message:
-            color = self.colors['success'] if self.message_type == 'success' else self.colors['error']
-            message_surface = self.fonts['message'].render(self.message, True, color)
-            message_rect = message_surface.get_rect(center=(self.screen.get_width() // 2, self.buttons['login'].bottom + 40))
-            self.screen.blit(message_surface, message_rect)
+        # 阴影
+        shadow_rect = rect.move(4, 4)
+        self.draw_rounded_rect_alpha(shadow_rect, radius, (0, 0, 0, 40))
+        
+        # 主背景 - 红色渐变
+        bg_surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+        
+        for y in range(rect.height):
+            progress = y / rect.height
+            r = int(220 * (1 - progress * 0.2))
+            g = int(50 * (1 - progress * 0.1))
+            b = int(50 * (1 - progress * 0.1))
+            pygame.draw.line(bg_surface, (r, g, b), (0, y), (rect.width, y))
+        
+        # 应用圆角
+        mask = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+        pygame.draw.rect(mask, (255, 255, 255), (0, 0, rect.width, rect.height), border_radius=radius)
+        
+        final_bg = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+        final_bg.blit(bg_surface, (0, 0))
+        final_bg.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
+        
+        self.screen.blit(final_bg, rect.topleft)
+        
+        # 顶部高光
+        highlight_rect = pygame.Rect(rect.x + 2, rect.y + 2, rect.width - 4, rect.height // 2)
+        self.draw_rounded_rect_alpha(highlight_rect, radius - 2, (255, 255, 255, 40))
+    
+    def draw_rounded_rect_alpha(self, rect, radius, color):
+        """绘制带透明度的圆角矩形"""
+        if len(color) == 4:
+            surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
+            pygame.draw.rect(surface, color, (0, 0, rect.width, rect.height), border_radius=radius)
+            self.screen.blit(surface, rect.topleft)
+        else:
+            pygame.draw.rect(self.screen, color, rect, border_radius=radius)
+    
+    def cleanup(self):
+        """清理资源"""
+        # 清理输入框
+        for input_comp in self.inputs.values():
+            input_comp.kill()
+        
+        # 清理视频背景
+        if self.video_background:
+            self.video_background.close()
     
     def run(self):
-        """运行场景的主循环"""
+        """运行场景的主循环（独立运行时使用）"""
         running = True
         clock = pygame.time.Clock()
         
         while running:
+            dt = clock.tick(60) / 1000.0
+            
             for event in pygame.event.get():
                 if not self.handle_event(event):
-                    return  # 场景结束，返回
+                    return
+            
+            if not self.update(dt):
+                return
             
             self.draw()
             pygame.display.flip()
-            clock.tick(60)
+        
+        self.cleanup()

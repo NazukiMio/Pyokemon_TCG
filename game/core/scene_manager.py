@@ -1,86 +1,161 @@
+import pygame
+import time
+from game.core.simple_transition import SimpleTransition
+from game.scenes.welcome_scene import WelcomeScene
+from game.scenes.login_scene import LoginScene
+from game.scenes.register_scene import RegisterScene
+from game.scenes.main_scene import MainScene
+
 class SceneManager:
-    """
-    场景管理器类，管理游戏的不同场景之间的切换
-    """
-    
     def __init__(self, screen):
-        """
-        初始化场景管理器
-        
-        Args:
-            screen: pygame屏幕对象
-        """
+        """初始化场景管理器"""
         self.screen = screen
-        self.current_scene = None
         self.scenes = {}
-        self.user_id = None
+        self.current_scene = None
+        self.transition = SimpleTransition(screen)
+        print("🎮 场景管理器初始化完成")
     
-    def add_scene(self, scene_name, scene_class):
-        """
-        添加场景到管理器
-        
-        Args:
-            scene_name: 场景名称（字符串）
-            scene_class: 场景类（类引用）
-        """
-        self.scenes[scene_name] = scene_class
+    def add_scene(self, name, scene_class):
+        """添加场景类"""
+        self.scenes[name] = scene_class
+        print(f"📝 注册场景: {name}")
     
-    def change_scene(self, scene_name, *args, **kwargs):
-        """
-        切换到指定场景
+    def run(self, initial_scene):
+        """运行场景管理器主循环"""
+        print(f"🚀 启动场景管理器，初始场景: {initial_scene}")
         
-        Args:
-            scene_name: 要切换到的场景名称
-            *args, **kwargs: 传递给场景构造函数的参数
-        
-        Returns:
-            布尔值表示是否成功切换
-        """
-        if scene_name not in self.scenes:
-            print(f"场景 '{scene_name}' 不存在")
+        # 启动初始场景
+        if not self.start_scene(initial_scene):
+            print(f"❌ 无法启动初始场景: {initial_scene}")
             return False
         
-        # 创建新场景实例，传入屏幕和回调函数
-        self.current_scene = self.scenes[scene_name](
-            self.screen, self.handle_scene_callback, *args, **kwargs
-        )
+        # 主循环
+        clock = pygame.time.Clock()
+        last_time = time.time()
+        running = True
+        
+        while running and self.current_scene is not None:
+            # 处理事件
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    running = False
+                    break
+                
+                # 传递事件给当前场景
+                if self.current_scene and hasattr(self.current_scene, 'handle_event'):
+                    self.current_scene.handle_event(event)
+            
+            if not running:
+                break
+            
+            # 计算时间差
+            current_time = time.time()
+            dt = current_time - last_time
+            last_time = current_time
+            dt = min(dt, 0.05)  # 限制最大时间步长
+            
+            # 更新场景管理器
+            if not self.update(dt):
+                print("🛑 场景管理器更新返回False，退出主循环")
+                break
+            
+            # 绘制
+            self.screen.fill((0, 0, 0))  # 清屏
+            self.draw()
+            pygame.display.flip()
+            
+            # 控制帧率
+            clock.tick(60)
+        
+        print("🏁 场景管理器主循环结束")
+        self.cleanup()
         return True
     
-    def handle_scene_callback(self, callback_data=None):
-        """
-        处理来自场景的回调
-        
-        Args:
-            callback_data: 场景返回的回调数据
-        """
-        if callback_data == "login":
-            # 切换到登录场景
-            self.change_scene("login")
-        elif callback_data == "register":
-            # 切换到注册场景
-            self.change_scene("register")
-        elif callback_data == "main_menu":
-            # 切换到主菜单场景
-            self.change_scene("main_menu", user_id=self.user_id)
-        elif isinstance(callback_data, int) or (isinstance(callback_data, str) and callback_data.isdigit()):
-            # 如果回调数据是用户ID，保存它并切换到主菜单
-            self.user_id = int(callback_data)
-            self.change_scene("main_menu", user_id=self.user_id)
+    def start_scene(self, scene_name, *args, **kwargs):
+        """启动初始场景"""
+        return self.switch_scene(scene_name, *args, **kwargs)
     
-    def run(self, initial_scene="login"):
-        """
-        运行场景管理器，启动初始场景
+    def update(self, dt):
+        """更新场景管理器"""
+        # 更新转换动画
+        self.transition.update(dt)
         
-        Args:
-            initial_scene: 初始场景名称
-        """
-        if not self.change_scene(initial_scene):
-            raise ValueError(f"无法启动初始场景: {initial_scene}")
-        
-        # 运行当前场景
-        while self.current_scene:
-            self.current_scene.run()
+        # 检查是否需要切换场景
+        if self.transition.is_switch_ready():
+            target_scene = self.transition.get_target_scene()
+            print(f"🔄 执行场景切换: {target_scene}")
             
-            # 如果场景运行结束但没有设置新场景，退出循环
-            if self.current_scene:
-                break
+            # 执行场景切换
+            if self.switch_scene(target_scene):
+                self.transition.confirm_switch()  # 确认切换，开始淡入
+        
+        # 更新当前场景（只有在不繁忙时才更新）
+        if self.current_scene and not self.transition.is_busy():
+            if hasattr(self.current_scene, 'update'):
+                scene_result = self.current_scene.update(dt)
+                if scene_result is False:
+                    return False
+        
+        return True
+    
+    def draw(self):
+        """绘制场景和转换效果"""
+        # 绘制当前场景
+        if self.current_scene and hasattr(self.current_scene, 'draw'):
+            self.current_scene.draw()
+        
+        # 绘制转换遮罩
+        self.transition.draw()
+    
+    def scene_callback(self, result):
+        """场景回调函数 - 现在只是触发转换"""
+        print(f"📞 场景请求: {result}")
+        
+        if result == "login":
+            self.transition.start_transition("login")
+        elif result == "register":
+            self.transition.start_transition("register")
+        elif result == "back":
+            self.transition.start_transition("welcome")
+        elif result == "game_main":
+            self.transition.start_transition("game_main")
+        elif result == "exit":
+            print("👋 用户退出")
+            self.current_scene = None
+        else:
+            print(f"⚠️ 未知请求: {result}")
+    
+    def switch_scene(self, scene_name, *args, **kwargs):
+        """切换到指定场景"""
+        if scene_name not in self.scenes:
+            print(f"❌ 场景不存在: {scene_name}")
+            return False
+        
+        try:
+            # 清理当前场景
+            if self.current_scene and hasattr(self.current_scene, 'cleanup'):
+                self.current_scene.cleanup()
+            
+            # 创建新场景
+            scene_class = self.scenes[scene_name]
+            self.current_scene = scene_class(
+                screen=self.screen,
+                callback=self.scene_callback,
+                *args, **kwargs
+            )
+            
+            print(f"✅ 已切换到场景: {scene_name}")
+            return True
+            
+        except Exception as e:
+            print(f"❌ 切换场景失败: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+    
+    def cleanup(self):
+        """清理场景管理器"""
+        if self.current_scene and hasattr(self.current_scene, 'cleanup'):
+            self.current_scene.cleanup()
+        self.current_scene = None
+        print("🧹 场景管理器已清理")
