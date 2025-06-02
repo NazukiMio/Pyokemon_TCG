@@ -1,12 +1,13 @@
 """
-重构后的数据库管理器
-使用DAO模式分离数据访问逻辑
+更新后的数据库管理器
+添加卡牌系统支持
 """
 
 import sqlite3
 import os
 from datetime import datetime
 from .daos.user_dao import UserDAO
+from .daos.card_dao import CardDAO
 
 class DatabaseManager:
     """
@@ -30,6 +31,7 @@ class DatabaseManager:
         
         # DAO对象
         self.user_dao = None
+        self.card_dao = None
         
         # 初始化数据库
         self.connect()
@@ -50,6 +52,7 @@ class DatabaseManager:
             
             # 初始化DAO对象
             self.user_dao = UserDAO(self.connection)
+            self.card_dao = CardDAO(self.connection)
             
             print("✅ 数据库连接成功")
             return True
@@ -65,6 +68,7 @@ class DatabaseManager:
                 self.connection = None
                 self.cursor = None
                 self.user_dao = None
+                self.card_dao = None
                 print("✅ 数据库连接已关闭")
             except sqlite3.Error as e:
                 print(f"❌ 关闭数据库连接时出错: {e}")
@@ -76,16 +80,21 @@ class DatabaseManager:
             if self.user_dao:
                 self.user_dao.create_user_table()
             
-            # 用户卡牌收藏表
+            # 创建卡牌相关表
+            if self.card_dao:
+                self.card_dao.create_card_tables()
+            
+            # 更新用户卡牌收藏表
             self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS user_cards (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
-                pokemon_id INTEGER NOT NULL,
+                card_id TEXT NOT NULL,
                 quantity INTEGER DEFAULT 1,
                 obtained_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
-                UNIQUE(user_id, pokemon_id)
+                FOREIGN KEY (card_id) REFERENCES cards (id) ON DELETE CASCADE,
+                UNIQUE(user_id, card_id)
             )
             ''')
             
@@ -103,16 +112,62 @@ class DatabaseManager:
             )
             ''')
             
-            # 卡组中的卡牌表
+            # 更新卡组中的卡牌表
             self.cursor.execute('''
             CREATE TABLE IF NOT EXISTS deck_cards (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 deck_id INTEGER NOT NULL,
-                pokemon_id INTEGER NOT NULL,
+                card_id TEXT NOT NULL,
                 quantity INTEGER DEFAULT 1,
                 added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (deck_id) REFERENCES decks (id) ON DELETE CASCADE,
-                UNIQUE(deck_id, pokemon_id)
+                FOREIGN KEY (card_id) REFERENCES cards (id) ON DELETE CASCADE,
+                UNIQUE(deck_id, card_id)
+            )
+            ''')
+            
+            # 用户经济数据表
+            self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_economy (
+                user_id INTEGER PRIMARY KEY,
+                coins INTEGER DEFAULT 500,
+                gems INTEGER DEFAULT 0,
+                pack_points INTEGER DEFAULT 0,
+                dust INTEGER DEFAULT 0,
+                last_daily_bonus DATE,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+            ''')
+            
+            # 卡包类型表
+            self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS pack_types (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL UNIQUE,
+                description TEXT,
+                cost_coins INTEGER DEFAULT 100,
+                cost_gems INTEGER DEFAULT 0,
+                card_count INTEGER DEFAULT 5,
+                guaranteed_rarity TEXT,
+                is_available BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            ''')
+            
+            # 卡包开启记录表
+            self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS pack_openings (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                pack_type_id INTEGER NOT NULL,
+                cards_obtained TEXT,
+                cost_type TEXT,
+                cost_amount INTEGER,
+                opened_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                FOREIGN KEY (pack_type_id) REFERENCES pack_types (id)
             )
             ''')
             
@@ -125,12 +180,65 @@ class DatabaseManager:
                 games_won INTEGER DEFAULT 0,
                 games_lost INTEGER DEFAULT 0,
                 cards_collected INTEGER DEFAULT 0,
+                packs_opened INTEGER DEFAULT 0,
+                dust_earned INTEGER DEFAULT 0,
                 last_played TIMESTAMP,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                 FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
             )
             ''')
+            
+            # 用户成就表
+            self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS user_achievements (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                achievement_type TEXT NOT NULL,
+                achievement_name TEXT NOT NULL,
+                description TEXT,
+                progress INTEGER DEFAULT 0,
+                target INTEGER NOT NULL,
+                completed BOOLEAN DEFAULT 0,
+                reward_coins INTEGER DEFAULT 0,
+                reward_gems INTEGER DEFAULT 0,
+                completed_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                UNIQUE(user_id, achievement_name)
+            )
+            ''')
+            
+            # 每日任务表
+            self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS daily_quests (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                user_id INTEGER NOT NULL,
+                quest_type TEXT NOT NULL,
+                description TEXT NOT NULL,
+                progress INTEGER DEFAULT 0,
+                target INTEGER NOT NULL,
+                reward_coins INTEGER DEFAULT 50,
+                reward_gems INTEGER DEFAULT 0,
+                completed BOOLEAN DEFAULT 0,
+                quest_date DATE NOT NULL,
+                completed_at TIMESTAMP,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+                UNIQUE(user_id, quest_type, quest_date)
+            )
+            ''')
+            
+            # 插入默认卡包类型
+            self.cursor.execute('''
+            INSERT OR IGNORE INTO pack_types (name, description, cost_coins, cost_gems, card_count, guaranteed_rarity) VALUES
+            ('Basic Pack', 'Contains 5 random cards with at least 1 Uncommon', 100, 0, 5, 'Uncommon'),
+            ('Premium Pack', 'Contains 5 cards with at least 1 Rare', 200, 0, 5, 'Rare'),
+            ('Ultra Pack', 'Contains 3 cards with guaranteed Ultra Rare', 0, 50, 3, 'Ultra Rare')
+            ''')
+            
+            # 创建索引
+            self._create_indexes()
             
             self.connection.commit()
             print("✅ 数据库表结构设置完成")
@@ -140,19 +248,29 @@ class DatabaseManager:
             print(f"❌ 设置数据库表结构失败: {e}")
             return False
     
-    # 用户相关方法（委托给UserDAO）
+    def _create_indexes(self):
+        """创建数据库索引"""
+        indexes = [
+            "CREATE INDEX IF NOT EXISTS idx_user_cards_user_id ON user_cards(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_user_cards_card_id ON user_cards(card_id)",
+            "CREATE INDEX IF NOT EXISTS idx_deck_cards_deck_id ON deck_cards(deck_id)",
+            "CREATE INDEX IF NOT EXISTS idx_cards_rarity ON cards(rarity)",
+            "CREATE INDEX IF NOT EXISTS idx_cards_types ON cards(types)",
+            "CREATE INDEX IF NOT EXISTS idx_pack_openings_user_id ON pack_openings(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_daily_quests_user_date ON daily_quests(user_id, quest_date)",
+            "CREATE INDEX IF NOT EXISTS idx_game_stats_user_id ON game_stats(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_user_achievements_user_id ON user_achievements(user_id)"
+        ]
+        
+        for index_sql in indexes:
+            try:
+                self.cursor.execute(index_sql)
+            except sqlite3.Error as e:
+                print(f"创建索引失败: {e}")
+    
+    # 保留原有的用户相关方法
     def register_user(self, username, password, email=None):
-        """
-        注册新用户
-        
-        Args:
-            username: 用户名
-            password: 密码
-            email: 邮箱（可选）
-        
-        Returns:
-            (成功标志, 消息)
-        """
+        """注册新用户"""
         if not self.user_dao:
             return False, "数据库未初始化"
         
@@ -160,73 +278,24 @@ class DatabaseManager:
         if success:
             # 创建用户游戏统计记录
             self._create_user_stats(result)
+            # 创建用户经济记录
+            self._create_user_economy(result)
             return True, "Usuario registrado con éxito"
         else:
             return False, result
     
     def login_user(self, username, password):
-        """
-        用户登录验证
-        
-        Args:
-            username: 用户名
-            password: 密码
-        
-        Returns:
-            (成功标志, 用户ID或错误消息)
-        """
+        """用户登录验证"""
         if not self.user_dao:
             return False, "数据库未初始化"
-        
         return self.user_dao.authenticate_user(username, password)
     
     def get_user_info(self, user_id):
-        """
-        获取用户信息
-        
-        Args:
-            user_id: 用户ID
-        
-        Returns:
-            用户信息字典或None
-        """
+        """获取用户信息"""
         if not self.user_dao:
             return None
-        
         return self.user_dao.get_user_by_id(user_id)
     
-    def update_user_password(self, user_id, new_password):
-        """
-        更新用户密码
-        
-        Args:
-            user_id: 用户ID
-            new_password: 新密码
-        
-        Returns:
-            (成功标志, 消息)
-        """
-        if not self.user_dao:
-            return False, "数据库未初始化"
-        
-        return self.user_dao.update_user_password(user_id, new_password)
-    
-    def delete_user(self, user_id):
-        """
-        删除用户
-        
-        Args:
-            user_id: 用户ID
-        
-        Returns:
-            (成功标志, 消息)
-        """
-        if not self.user_dao:
-            return False, "数据库未初始化"
-        
-        return self.user_dao.delete_user(user_id)
-    
-    # 游戏统计相关方法
     def _create_user_stats(self, user_id):
         """创建用户游戏统计记录"""
         try:
@@ -240,16 +309,357 @@ class DatabaseManager:
             print(f"创建用户统计记录失败: {e}")
             return False
     
+    def _create_user_economy(self, user_id):
+        """创建用户经济记录"""
+        try:
+            self.cursor.execute(
+                "INSERT INTO user_economy (user_id) VALUES (?)",
+                (user_id,)
+            )
+            self.connection.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"创建用户经济记录失败: {e}")
+            return False
+    
+    # 新增：用户经济相关方法
+    def get_user_economy(self, user_id):
+        """获取用户经济数据"""
+        try:
+            self.cursor.execute(
+                "SELECT * FROM user_economy WHERE user_id = ?",
+                (user_id,)
+            )
+            economy = self.cursor.fetchone()
+            
+            if economy:
+                return {
+                    'user_id': economy[0],
+                    'coins': economy[1],
+                    'gems': economy[2],
+                    'pack_points': economy[3],
+                    'dust': economy[4],
+                    'last_daily_bonus': economy[5]
+                }
+            return None
+        except sqlite3.Error as e:
+            print(f"获取用户经济数据失败: {e}")
+            return None
+    
+    def update_user_economy(self, user_id, **kwargs):
+        """更新用户经济数据"""
+        try:
+            set_clauses = []
+            values = []
+            
+            for key, value in kwargs.items():
+                if key in ['coins', 'gems', 'pack_points', 'dust', 'last_daily_bonus']:
+                    set_clauses.append(f"{key} = ?")
+                    values.append(value)
+            
+            if not set_clauses:
+                return True
+            
+            set_clauses.append("updated_at = CURRENT_TIMESTAMP")
+            values.append(user_id)
+            
+            sql = f"UPDATE user_economy SET {', '.join(set_clauses)} WHERE user_id = ?"
+            
+            self.cursor.execute(sql, values)
+            self.connection.commit()
+            
+            return True
+        except sqlite3.Error as e:
+            print(f"更新用户经济数据失败: {e}")
+            return False
+    
+    def add_currency(self, user_id, currency_type, amount):
+        """添加货币"""
+        try:
+            if currency_type not in ['coins', 'gems', 'pack_points', 'dust']:
+                return False
+            
+            self.cursor.execute(
+                f"UPDATE user_economy SET {currency_type} = {currency_type} + ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?",
+                (amount, user_id)
+            )
+            self.connection.commit()
+            
+            return self.cursor.rowcount > 0
+        except sqlite3.Error as e:
+            print(f"添加货币失败: {e}")
+            return False
+    
+    def spend_currency(self, user_id, currency_type, amount):
+        """消费货币"""
+        try:
+            if currency_type not in ['coins', 'gems', 'pack_points', 'dust']:
+                return False
+            
+            # 检查余额
+            economy = self.get_user_economy(user_id)
+            if not economy or economy[currency_type] < amount:
+                return False
+            
+            self.cursor.execute(
+                f"UPDATE user_economy SET {currency_type} = {currency_type} - ?, updated_at = CURRENT_TIMESTAMP WHERE user_id = ?",
+                (amount, user_id)
+            )
+            self.connection.commit()
+            
+            return self.cursor.rowcount > 0
+        except sqlite3.Error as e:
+            print(f"消费货币失败: {e}")
+            return False
+    
+    # 新增：卡包相关方法
+    def get_pack_types(self):
+        """获取所有卡包类型"""
+        try:
+            self.cursor.execute(
+                "SELECT * FROM pack_types WHERE is_available = 1 ORDER BY cost_coins, cost_gems"
+            )
+            packs = self.cursor.fetchall()
+            
+            return [
+                {
+                    'id': pack[0],
+                    'name': pack[1],
+                    'description': pack[2],
+                    'cost_coins': pack[3],
+                    'cost_gems': pack[4],
+                    'card_count': pack[5],
+                    'guaranteed_rarity': pack[6]
+                }
+                for pack in packs
+            ]
+        except sqlite3.Error as e:
+            print(f"获取卡包类型失败: {e}")
+            return []
+    
+    def record_pack_opening(self, user_id, pack_type_id, cards_obtained, cost_type, cost_amount):
+        """记录卡包开启"""
+        try:
+            import json
+            
+            self.cursor.execute('''
+            INSERT INTO pack_openings (user_id, pack_type_id, cards_obtained, cost_type, cost_amount)
+            VALUES (?, ?, ?, ?, ?)
+            ''', (user_id, pack_type_id, json.dumps(cards_obtained), cost_type, cost_amount))
+            
+            self.connection.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"记录卡包开启失败: {e}")
+            return False
+    
+    def get_pack_opening_history(self, user_id, limit=20):
+        """获取卡包开启历史"""
+        try:
+            self.cursor.execute('''
+            SELECT po.*, pt.name as pack_name 
+            FROM pack_openings po
+            JOIN pack_types pt ON po.pack_type_id = pt.id
+            WHERE po.user_id = ?
+            ORDER BY po.opened_at DESC
+            LIMIT ?
+            ''', (user_id, limit))
+            
+            history = self.cursor.fetchall()
+            
+            result = []
+            for record in history:
+                import json
+                try:
+                    cards_obtained = json.loads(record[3])
+                except:
+                    cards_obtained = []
+                
+                result.append({
+                    'id': record[0],
+                    'pack_type_id': record[2],
+                    'pack_name': record[7],
+                    'cards_obtained': cards_obtained,
+                    'cost_type': record[4],
+                    'cost_amount': record[5],
+                    'opened_at': record[6]
+                })
+            
+            return result
+        except sqlite3.Error as e:
+            print(f"获取卡包开启历史失败: {e}")
+            return []
+    
+    # 新增：成就相关方法
+    def create_achievement(self, user_id, achievement_type, achievement_name, description, target, reward_coins=0, reward_gems=0):
+        """创建成就"""
+        try:
+            self.cursor.execute('''
+            INSERT OR IGNORE INTO user_achievements 
+            (user_id, achievement_type, achievement_name, description, target, reward_coins, reward_gems)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (user_id, achievement_type, achievement_name, description, target, reward_coins, reward_gems))
+            
+            self.connection.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"创建成就失败: {e}")
+            return False
+    
+    def update_achievement_progress(self, user_id, achievement_name, progress):
+        """更新成就进度"""
+        try:
+            self.cursor.execute('''
+            UPDATE user_achievements 
+            SET progress = ?, 
+                completed = CASE WHEN progress >= target THEN 1 ELSE 0 END,
+                completed_at = CASE WHEN progress >= target AND completed = 0 THEN CURRENT_TIMESTAMP ELSE completed_at END
+            WHERE user_id = ? AND achievement_name = ?
+            ''', (progress, user_id, achievement_name))
+            
+            self.connection.commit()
+            
+            # 检查是否刚完成成就
+            if self.cursor.rowcount > 0:
+                self.cursor.execute(
+                    "SELECT completed, reward_coins, reward_gems FROM user_achievements WHERE user_id = ? AND achievement_name = ? AND completed = 1 AND completed_at > datetime('now', '-1 minute')",
+                    (user_id, achievement_name)
+                )
+                result = self.cursor.fetchone()
+                
+                if result:
+                    # 发放奖励
+                    if result[1] > 0:  # 金币奖励
+                        self.add_currency(user_id, 'coins', result[1])
+                    if result[2] > 0:  # 宝石奖励
+                        self.add_currency(user_id, 'gems', result[2])
+                    
+                    return True, "成就完成！获得奖励"
+            
+            return True, "进度已更新"
+        except sqlite3.Error as e:
+            print(f"更新成就进度失败: {e}")
+            return False, str(e)
+    
+    def get_user_achievements(self, user_id, completed_only=False):
+        """获取用户成就"""
+        try:
+            if completed_only:
+                condition = "WHERE user_id = ? AND completed = 1"
+            else:
+                condition = "WHERE user_id = ?"
+            
+            self.cursor.execute(f'''
+            SELECT * FROM user_achievements 
+            {condition}
+            ORDER BY completed DESC, progress DESC
+            ''', (user_id,))
+            
+            achievements = self.cursor.fetchall()
+            
+            return [
+                {
+                    'id': ach[0],
+                    'achievement_type': ach[2],
+                    'achievement_name': ach[3],
+                    'description': ach[4],
+                    'progress': ach[5],
+                    'target': ach[6],
+                    'completed': bool(ach[7]),
+                    'reward_coins': ach[8],
+                    'reward_gems': ach[9],
+                    'completed_at': ach[10]
+                }
+                for ach in achievements
+            ]
+        except sqlite3.Error as e:
+            print(f"获取用户成就失败: {e}")
+            return []
+    
+    # 新增：每日任务相关方法
+    def create_daily_quest(self, user_id, quest_type, description, target, quest_date, reward_coins=50, reward_gems=0):
+        """创建每日任务"""
+        try:
+            self.cursor.execute('''
+            INSERT OR IGNORE INTO daily_quests 
+            (user_id, quest_type, description, target, quest_date, reward_coins, reward_gems)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+            ''', (user_id, quest_type, description, target, quest_date, reward_coins, reward_gems))
+            
+            self.connection.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"创建每日任务失败: {e}")
+            return False
+    
+    def update_quest_progress(self, user_id, quest_type, quest_date, progress):
+        """更新任务进度"""
+        try:
+            self.cursor.execute('''
+            UPDATE daily_quests 
+            SET progress = ?, 
+                completed = CASE WHEN progress >= target THEN 1 ELSE 0 END,
+                completed_at = CASE WHEN progress >= target AND completed = 0 THEN CURRENT_TIMESTAMP ELSE completed_at END
+            WHERE user_id = ? AND quest_type = ? AND quest_date = ?
+            ''', (progress, user_id, quest_type, quest_date))
+            
+            self.connection.commit()
+            
+            # 检查是否刚完成任务
+            if self.cursor.rowcount > 0:
+                self.cursor.execute(
+                    "SELECT completed, reward_coins, reward_gems FROM daily_quests WHERE user_id = ? AND quest_type = ? AND quest_date = ? AND completed = 1 AND completed_at > datetime('now', '-1 minute')",
+                    (user_id, quest_type, quest_date)
+                )
+                result = self.cursor.fetchone()
+                
+                if result:
+                    # 发放奖励
+                    if result[1] > 0:  # 金币奖励
+                        self.add_currency(user_id, 'coins', result[1])
+                    if result[2] > 0:  # 宝石奖励
+                        self.add_currency(user_id, 'gems', result[2])
+                    
+                    return True, "任务完成！获得奖励"
+            
+            return True, "进度已更新"
+        except sqlite3.Error as e:
+            print(f"更新任务进度失败: {e}")
+            return False, str(e)
+    
+    def get_daily_quests(self, user_id, quest_date):
+        """获取每日任务"""
+        try:
+            self.cursor.execute('''
+            SELECT * FROM daily_quests 
+            WHERE user_id = ? AND quest_date = ?
+            ORDER BY completed, created_at
+            ''', (user_id, quest_date))
+            
+            quests = self.cursor.fetchall()
+            
+            return [
+                {
+                    'id': quest[0],
+                    'quest_type': quest[2],
+                    'description': quest[3],
+                    'progress': quest[4],
+                    'target': quest[5],
+                    'reward_coins': quest[6],
+                    'reward_gems': quest[7],
+                    'completed': bool(quest[8]),
+                    'quest_date': quest[9],
+                    'completed_at': quest[10]
+                }
+                for quest in quests
+            ]
+        except sqlite3.Error as e:
+            print(f"获取每日任务失败: {e}")
+            return []
+    
+    # 更新原有的统计方法
     def get_user_stats(self, user_id):
-        """
-        获取用户游戏统计
-        
-        Args:
-            user_id: 用户ID
-        
-        Returns:
-            统计信息字典或None
-        """
+        """获取用户游戏统计"""
         try:
             self.cursor.execute(
                 "SELECT * FROM game_stats WHERE user_id = ?",
@@ -258,30 +668,29 @@ class DatabaseManager:
             stats = self.cursor.fetchone()
             
             if stats:
-                return dict(stats)
+                return {
+                    'user_id': stats[1],
+                    'games_played': stats[2],
+                    'games_won': stats[3],
+                    'games_lost': stats[4],
+                    'cards_collected': stats[5],
+                    'packs_opened': stats[6],
+                    'dust_earned': stats[7],
+                    'last_played': stats[8]
+                }
             return None
         except sqlite3.Error as e:
             print(f"获取用户统计失败: {e}")
             return None
     
     def update_user_stats(self, user_id, **kwargs):
-        """
-        更新用户游戏统计
-        
-        Args:
-            user_id: 用户ID
-            **kwargs: 要更新的统计字段
-        
-        Returns:
-            成功标志
-        """
+        """更新用户游戏统计"""
         try:
-            # 构建更新SQL
             set_clauses = []
             values = []
             
             for key, value in kwargs.items():
-                if key in ['games_played', 'games_won', 'games_lost', 'cards_collected']:
+                if key in ['games_played', 'games_won', 'games_lost', 'cards_collected', 'packs_opened', 'dust_earned']:
                     set_clauses.append(f"{key} = ?")
                     values.append(value)
             
@@ -289,6 +698,7 @@ class DatabaseManager:
                 return True
             
             set_clauses.append("updated_at = CURRENT_TIMESTAMP")
+            set_clauses.append("last_played = CURRENT_TIMESTAMP")
             values.append(user_id)
             
             sql = f"UPDATE game_stats SET {', '.join(set_clauses)} WHERE user_id = ?"
@@ -301,70 +711,50 @@ class DatabaseManager:
             print(f"更新用户统计失败: {e}")
             return False
     
-    # 卡牌相关方法
+    # 保留原有的卡牌相关方法但使用新的卡牌ID格式
     def get_user_cards(self, user_id):
-        """
-        获取用户的所有卡牌
-        
-        Args:
-            user_id: 用户ID
-        
-        Returns:
-            卡牌列表或空列表
-        """
+        """获取用户的所有卡牌"""
         try:
             self.cursor.execute(
-                "SELECT pokemon_id, quantity, obtained_at FROM user_cards WHERE user_id = ? ORDER BY obtained_at DESC",
+                "SELECT card_id, quantity, obtained_at FROM user_cards WHERE user_id = ? ORDER BY obtained_at DESC",
                 (user_id,)
             )
             cards = self.cursor.fetchall()
             
-            return [dict(card) for card in cards] if cards else []
+            return [{'card_id': card[0], 'quantity': card[1], 'obtained_at': card[2]} for card in cards] if cards else []
         except sqlite3.Error as e:
             print(f"获取用户卡牌失败: {e}")
             return []
     
-    def add_card_to_user(self, user_id, pokemon_id, quantity=1):
-        """
-        向用户收藏添加卡牌
-        
-        Args:
-            user_id: 用户ID
-            pokemon_id: 宝可梦ID
-            quantity: 添加数量
-        
-        Returns:
-            成功标志
-        """
+    def add_card_to_user(self, user_id, card_id, quantity=1):
+        """向用户收藏添加卡牌"""
         try:
-            # 使用UPSERT操作
             self.cursor.execute(
                 """
-                INSERT INTO user_cards (user_id, pokemon_id, quantity)
+                INSERT INTO user_cards (user_id, card_id, quantity)
                 VALUES (?, ?, ?)
-                ON CONFLICT(user_id, pokemon_id)
+                ON CONFLICT(user_id, card_id)
                 DO UPDATE SET quantity = quantity + ?, obtained_at = CURRENT_TIMESTAMP
                 """,
-                (user_id, pokemon_id, quantity, quantity)
+                (user_id, card_id, quantity, quantity)
             )
             
             self.connection.commit()
+            
+            # 更新统计
+            current_stats = self.get_user_stats(user_id)
+            if current_stats:
+                new_cards_collected = current_stats['cards_collected'] + quantity
+                self.update_user_stats(user_id, cards_collected=new_cards_collected)
+            
             return True
         except sqlite3.Error as e:
             print(f"添加用户卡牌失败: {e}")
             return False
     
-    # 卡组相关方法
+    # 保留原有的卡组相关方法
     def get_user_decks(self, user_id):
-        """
-        获取用户的所有卡组
-        
-        Args:
-            user_id: 用户ID
-        
-        Returns:
-            卡组列表或空列表
-        """
+        """获取用户的所有卡组"""
         try:
             self.cursor.execute(
                 "SELECT id, name, description, created_at, updated_at FROM decks WHERE user_id = ? AND is_active = 1 ORDER BY created_at DESC",
@@ -378,17 +768,7 @@ class DatabaseManager:
             return []
     
     def create_new_deck(self, user_id, deck_name, description=""):
-        """
-        为用户创建新卡组
-        
-        Args:
-            user_id: 用户ID
-            deck_name: 卡组名称
-            description: 卡组描述
-        
-        Returns:
-            (成功标志, 卡组ID或错误消息)
-        """
+        """为用户创建新卡组"""
         try:
             self.cursor.execute(
                 "INSERT INTO decks (user_id, name, description) VALUES (?, ?, ?)",
@@ -401,28 +781,17 @@ class DatabaseManager:
             print(f"创建卡组失败: {e}")
             return False, f"Error al crear el mazo: {str(e)}"
     
-    def add_card_to_deck(self, deck_id, pokemon_id, quantity=1):
-        """
-        向卡组添加卡牌
-        
-        Args:
-            deck_id: 卡组ID
-            pokemon_id: 宝可梦ID
-            quantity: 添加数量
-        
-        Returns:
-            成功标志
-        """
+    def add_card_to_deck(self, deck_id, card_id, quantity=1):
+        """向卡组添加卡牌"""
         try:
-            # 使用UPSERT操作
             self.cursor.execute(
                 """
-                INSERT INTO deck_cards (deck_id, pokemon_id, quantity)
+                INSERT INTO deck_cards (deck_id, card_id, quantity)
                 VALUES (?, ?, ?)
-                ON CONFLICT(deck_id, pokemon_id)
+                ON CONFLICT(deck_id, card_id)
                 DO UPDATE SET quantity = quantity + ?, added_at = CURRENT_TIMESTAMP
                 """,
-                (deck_id, pokemon_id, quantity, quantity)
+                (deck_id, card_id, quantity, quantity)
             )
             
             self.connection.commit()
@@ -432,18 +801,10 @@ class DatabaseManager:
             return False
     
     def get_deck_cards(self, deck_id):
-        """
-        获取卡组中的所有卡牌
-        
-        Args:
-            deck_id: 卡组ID
-        
-        Returns:
-            卡牌列表或空列表
-        """
+        """获取卡组中的所有卡牌"""
         try:
             self.cursor.execute(
-                "SELECT pokemon_id, quantity, added_at FROM deck_cards WHERE deck_id = ? ORDER BY added_at DESC",
+                "SELECT card_id, quantity, added_at FROM deck_cards WHERE deck_id = ? ORDER BY added_at DESC",
                 (deck_id,)
             )
             cards = self.cursor.fetchall()
@@ -453,96 +814,16 @@ class DatabaseManager:
             print(f"获取卡组卡牌失败: {e}")
             return []
     
-    def remove_card_from_deck(self, deck_id, pokemon_id, quantity=1):
-        """
-        从卡组移除卡牌
-        
-        Args:
-            deck_id: 卡组ID
-            pokemon_id: 宝可梦ID
-            quantity: 移除数量
-        
-        Returns:
-            成功标志
-        """
-        try:
-            # 先获取当前数量
-            self.cursor.execute(
-                "SELECT quantity FROM deck_cards WHERE deck_id = ? AND pokemon_id = ?",
-                (deck_id, pokemon_id)
-            )
-            result = self.cursor.fetchone()
-            
-            if not result:
-                return False  # 卡牌不在卡组中
-            
-            current_quantity = result[0]
-            new_quantity = current_quantity - quantity
-            
-            if new_quantity <= 0:
-                # 完全移除卡牌
-                self.cursor.execute(
-                    "DELETE FROM deck_cards WHERE deck_id = ? AND pokemon_id = ?",
-                    (deck_id, pokemon_id)
-                )
-            else:
-                # 减少数量
-                self.cursor.execute(
-                    "UPDATE deck_cards SET quantity = ? WHERE deck_id = ? AND pokemon_id = ?",
-                    (new_quantity, deck_id, pokemon_id)
-                )
-            
-            self.connection.commit()
-            return True
-        except sqlite3.Error as e:
-            print(f"从卡组移除卡牌失败: {e}")
-            return False
-    
-    def delete_deck(self, deck_id):
-        """
-        删除卡组（软删除）
-        
-        Args:
-            deck_id: 卡组ID
-        
-        Returns:
-            (成功标志, 消息)
-        """
-        try:
-            self.cursor.execute(
-                "UPDATE decks SET is_active = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?",
-                (deck_id,)
-            )
-            self.connection.commit()
-            
-            if self.cursor.rowcount > 0:
-                return True, "Mazo eliminado con éxito"
-            else:
-                return False, "Mazo no encontrado"
-        except sqlite3.Error as e:
-            print(f"删除卡组失败: {e}")
-            return False, f"Error al eliminar mazo: {str(e)}"
-    
-    # 数据库维护方法
+    # 保留其他原有方法...
     def backup_database(self, backup_path=None):
-        """
-        备份数据库
-        
-        Args:
-            backup_path: 备份文件路径，如果为None则使用默认路径
-        
-        Returns:
-            成功标志
-        """
+        """备份数据库"""
         try:
             if backup_path is None:
                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
                 backup_path = f"data/backup/game_database_{timestamp}.db"
             
-            # 确保备份目录存在
             os.makedirs(os.path.dirname(backup_path), exist_ok=True)
             
-            # 创建备份
             backup_conn = sqlite3.connect(backup_path)
             self.connection.backup(backup_conn)
             backup_conn.close()
@@ -553,43 +834,19 @@ class DatabaseManager:
             print(f"❌ 数据库备份失败: {e}")
             return False
     
-    def vacuum_database(self):
-        """
-        清理数据库（回收空间）
-        
-        Returns:
-            成功标志
-        """
-        try:
-            self.cursor.execute("VACUUM")
-            self.connection.commit()
-            print("✅ 数据库清理完成")
-            return True
-        except sqlite3.Error as e:
-            print(f"❌ 数据库清理失败: {e}")
-            return False
-    
     def get_database_info(self):
-        """
-        获取数据库信息
-        
-        Returns:
-            数据库信息字典
-        """
+        """获取数据库信息"""
         try:
             info = {}
             
-            # 获取数据库大小
             if os.path.exists(self.db_path):
                 info['size_bytes'] = os.path.getsize(self.db_path)
                 info['size_mb'] = round(info['size_bytes'] / (1024 * 1024), 2)
             
-            # 获取表数量和记录数
             self.cursor.execute("SELECT name FROM sqlite_master WHERE type='table'")
             tables = self.cursor.fetchall()
             info['table_count'] = len(tables)
             
-            # 获取各表的记录数
             table_counts = {}
             for table in tables:
                 table_name = table[0]
@@ -605,181 +862,11 @@ class DatabaseManager:
             print(f"获取数据库信息失败: {e}")
             return {}
     
-    def execute_custom_query(self, query, params=None, fetch_all=True):
-        """
-        执行自定义查询（谨慎使用）
-        
-        Args:
-            query: SQL查询语句
-            params: 查询参数
-            fetch_all: 是否获取所有结果
-        
-        Returns:
-            查询结果或None
-        """
-        try:
-            if params:
-                self.cursor.execute(query, params)
-            else:
-                self.cursor.execute(query)
-            
-            if query.strip().upper().startswith(('INSERT', 'UPDATE', 'DELETE')):
-                self.connection.commit()
-                return self.cursor.rowcount
-            else:
-                if fetch_all:
-                    return self.cursor.fetchall()
-                else:
-                    return self.cursor.fetchone()
-        except sqlite3.Error as e:
-            print(f"执行自定义查询失败: {e}")
-            return None
-    
-    # 高级查询方法
-    def get_user_collection_summary(self, user_id):
-        """
-        获取用户收藏摘要
-        
-        Args:
-            user_id: 用户ID
-        
-        Returns:
-            收藏摘要字典
-        """
-        try:
-            # 总卡牌数量
-            self.cursor.execute(
-                "SELECT COUNT(DISTINCT pokemon_id), SUM(quantity) FROM user_cards WHERE user_id = ?",
-                (user_id,)
-            )
-            unique_cards, total_cards = self.cursor.fetchone()
-            
-            # 最新获得的卡牌
-            self.cursor.execute(
-                "SELECT pokemon_id, quantity, obtained_at FROM user_cards WHERE user_id = ? ORDER BY obtained_at DESC LIMIT 5",
-                (user_id,)
-            )
-            recent_cards = [dict(row) for row in self.cursor.fetchall()]
-            
-            return {
-                'unique_cards': unique_cards or 0,
-                'total_cards': total_cards or 0,
-                'recent_cards': recent_cards
-            }
-        except sqlite3.Error as e:
-            print(f"获取用户收藏摘要失败: {e}")
-            return {'unique_cards': 0, 'total_cards': 0, 'recent_cards': []}
-    
-    def get_deck_summary(self, deck_id):
-        """
-        获取卡组摘要
-        
-        Args:
-            deck_id: 卡组ID
-        
-        Returns:
-            卡组摘要字典
-        """
-        try:
-            # 卡组基本信息
-            self.cursor.execute(
-                "SELECT name, description, created_at FROM decks WHERE id = ? AND is_active = 1",
-                (deck_id,)
-            )
-            deck_info = self.cursor.fetchone()
-            
-            if not deck_info:
-                return None
-            
-            # 卡牌统计
-            self.cursor.execute(
-                "SELECT COUNT(DISTINCT pokemon_id), SUM(quantity) FROM deck_cards WHERE deck_id = ?",
-                (deck_id,)
-            )
-            unique_cards, total_cards = self.cursor.fetchone()
-            
-            return {
-                'name': deck_info[0],
-                'description': deck_info[1],
-                'created_at': deck_info[2],
-                'unique_cards': unique_cards or 0,
-                'total_cards': total_cards or 0
-            }
-        except sqlite3.Error as e:
-            print(f"获取卡组摘要失败: {e}")
-            return None
-    
-    def search_user_cards(self, user_id, search_term=None, limit=50):
-        """
-        搜索用户卡牌
-        
-        Args:
-            user_id: 用户ID
-            search_term: 搜索关键词（可选）
-            limit: 结果限制数量
-        
-        Returns:
-            卡牌列表
-        """
-        try:
-            if search_term:
-                # 这里假设有一个pokemon表存储宝可梦信息
-                # 实际实现时需要根据您的数据结构调整
-                self.cursor.execute(
-                    """
-                    SELECT uc.pokemon_id, uc.quantity, uc.obtained_at 
-                    FROM user_cards uc 
-                    WHERE uc.user_id = ? AND uc.pokemon_id LIKE ?
-                    ORDER BY uc.obtained_at DESC 
-                    LIMIT ?
-                    """,
-                    (user_id, f"%{search_term}%", limit)
-                )
-            else:
-                self.cursor.execute(
-                    "SELECT pokemon_id, quantity, obtained_at FROM user_cards WHERE user_id = ? ORDER BY obtained_at DESC LIMIT ?",
-                    (user_id, limit)
-                )
-            
-            return [dict(row) for row in self.cursor.fetchall()]
-        except sqlite3.Error as e:
-            print(f"搜索用户卡牌失败: {e}")
-            return []
-    
-    def get_popular_cards(self, limit=20):
-        """
-        获取热门卡牌（被收藏最多的）
-        
-        Args:
-            limit: 结果限制数量
-        
-        Returns:
-            热门卡牌列表
-        """
-        try:
-            self.cursor.execute(
-                """
-                SELECT pokemon_id, COUNT(DISTINCT user_id) as collectors, SUM(quantity) as total_quantity
-                FROM user_cards 
-                GROUP BY pokemon_id 
-                ORDER BY collectors DESC, total_quantity DESC 
-                LIMIT ?
-                """,
-                (limit,)
-            )
-            
-            return [dict(row) for row in self.cursor.fetchall()]
-        except sqlite3.Error as e:
-            print(f"获取热门卡牌失败: {e}")
-            return []
-    
     # 上下文管理器支持
     def __enter__(self):
-        """上下文管理器入口"""
         return self
     
     def __exit__(self, exc_type, exc_val, exc_tb):
-        """上下文管理器出口"""
         if exc_type is not None:
             print(f"数据库操作发生异常: {exc_val}")
             if self.connection:
@@ -787,5 +874,4 @@ class DatabaseManager:
         self.close()
     
     def __del__(self):
-        """析构函数"""
         self.close()

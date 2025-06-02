@@ -1,25 +1,23 @@
 """
 重构后的现代化注册场景
-使用组件化设计和统一样式
+使用pygame_gui替代自定义UI组件，复用login主题
 """
 
 import pygame
 import pygame_gui
+import shutil
 import sys
 import os
 
 # 导入核心模块
 from game.core.auth.auth_manager import AuthManager
-from game.scenes.components.button_component import ModernButton
-from game.scenes.components.input_component import ModernInput, PasswordStrengthIndicator
 from game.scenes.components.message_component import MessageManager, ToastMessage
-from game.scenes.animations.transitions import FadeTransition
 from game.scenes.styles.theme import Theme
 from game.scenes.styles.fonts import font_manager
 from game.utils.video_background import VideoBackground
 
 class RegisterScene:
-    """现代化注册场景类，使用统一的组件系统"""
+    """现代化注册场景类，使用pygame_gui组件系统"""
     
     def __init__(self, screen, callback=None):
         """
@@ -36,19 +34,21 @@ class RegisterScene:
         # 缩放因子
         self.scale_factor = min(screen.get_width() / 1920, screen.get_height() / 1080)
         
-        # 初始化pygame-gui
-        self.ui_manager = pygame_gui.UIManager(screen.get_size())
-        self.setup_ui_theme()
+        # 复用login主题
+        self.setup_pygame_gui()
         
         # 组件管理器
         self.message_manager = MessageManager()
-        # self.transition_manager = FadeTransition(screen)
         
         # UI组件
         self.inputs = {}
         self.buttons = {}
-        self.password_strength = None
+        self.labels = {}
         self.toast_message = None
+        
+        # 密码强度显示
+        self.password_strength_text = ""
+        self.password_strength_color = (150, 150, 150)
         
         # 背景
         self.background_surface = None
@@ -59,23 +59,66 @@ class RegisterScene:
         self.logo = None
         self.load_logo()
         
+        # 副标题Logo
+        self.subtitle_logo = None
+        self.load_subtitle_logo()
+        
         # 设置UI元素
         self.setup_ui_elements()
         
-        # # 开始淡入动画
-        # self.transition_manager.start_fade_in()
+        print("✅ 注册场景初始化完成")
 
-        # # 使用传入的转换管理器，如果没有就创建自己的
-        # if transition_manager:
-        #     self.transition_manager = transition_manager
-        #     print("🔗 使用共享转换管理器")
-        # else:
-        #     self.transition_manager = FadeTransition(screen)
-        #     print("🆕 创建新的转换管理器")
-
-    def setup_ui_theme(self):
-        """设置现代UI主题"""
-        self.ui_manager.get_theme().load_theme(Theme.UI_THEME_DATA)
+    def setup_pygame_gui(self):
+        """复用login主题"""
+        # 直接复制login主题文件
+        try:
+            if os.path.exists('login_theme.json'):
+                shutil.copy2('login_theme.json', 'register_theme.json')
+                print("✅ 复用login主题文件")
+            else:
+                print("⚠️ login主题文件不存在，创建基础主题")
+                self.create_basic_theme()
+        except Exception as e:
+            print(f"⚠️ 主题文件复制失败: {e}")
+            self.create_basic_theme()
+        
+        # 创建UI管理器
+        self.ui_manager = pygame_gui.UIManager(
+            self.screen.get_size(), 
+            theme_path='register_theme.json'
+        )
+    
+    def create_basic_theme(self):
+        """创建基础主题（后备方案）"""
+        import json
+        theme_data = {
+            "#main_button": {
+                "colours": {
+                    "normal_bg": "#5865F2",
+                    "hovered_bg": "#4338D8",
+                    "normal_text": "#FFFFFF",
+                    "hovered_text": "#FFFFFF"
+                },
+                "misc": {
+                    "shape": "rounded_rectangle",
+                    "shape_corner_radius": "16"
+                }
+            },
+            "text_entry_line": {
+                "colours": {
+                    "normal_bg": "#FFFFFF",
+                    "normal_text": "#FFFFFF",
+                    "focused_border": "#5865F2"
+                },
+                "misc": {
+                    "shape": "rounded_rectangle",
+                    "shape_corner_radius": "12"
+                }
+            }
+        }
+        
+        with open('register_theme.json', 'w') as f:
+            json.dump(theme_data, f, indent=2)
     
     def setup_background(self):
         """设置背景效果"""
@@ -122,6 +165,20 @@ class RegisterScene:
         except Exception as e:
             print(f"⚠️ Logo加载失败: {e}")
     
+    def load_subtitle_logo(self):
+        """加载副标题Logo"""
+        try:
+            logo_path = os.path.join("assets", "images", "logo", "secondLogo.png")
+            if os.path.exists(logo_path):
+                self.subtitle_logo = pygame.image.load(logo_path)
+                # 调整副标题Logo大小
+                logo_width = int(self.screen.get_width() * 0.4)
+                logo_height = int(logo_width * (self.subtitle_logo.get_height() / self.subtitle_logo.get_width()))
+                self.subtitle_logo = pygame.transform.smoothscale(self.subtitle_logo, (logo_width, logo_height))
+                print("✅ 副标题Logo加载成功")
+        except Exception as e:
+            print(f"⚠️ 副标题Logo加载失败: {e}")
+    
     def setup_ui_elements(self):
         """设置UI元素"""
         screen_width, screen_height = self.screen.get_size()
@@ -131,97 +188,79 @@ class RegisterScene:
         center_x = screen_width // 2
         start_y = int(screen_height * 0.35)
         
-        # 创建输入框
+        # 创建标签和输入框
+        # 用户名标签
+        username_label_rect = pygame.Rect(center_x - form_width // 2, start_y - 25, form_width, 20)
+        self.labels['username'] = pygame_gui.elements.UILabel(
+            relative_rect=username_label_rect,
+            text='Nombre de usuario',
+            manager=self.ui_manager
+        )
+        
+        # 用户名输入框
         username_rect = pygame.Rect(center_x - form_width // 2, start_y, form_width, 
                                    Theme.get_scaled_size('input_height', self.scale_factor))
-        self.inputs['username'] = ModernInput(
-            username_rect, 
-            placeholder="Nombre de usuario",
-            label="Nombre de usuario",
-            ui_manager=self.ui_manager
+        self.inputs['username'] = pygame_gui.elements.UITextEntryLine(
+            relative_rect=username_rect,
+            placeholder_text="Nombre de usuario",
+            manager=self.ui_manager
         )
         
+        # 密码标签
+        password_label_rect = pygame.Rect(center_x - form_width // 2, start_y + 80 - 25, form_width, 20)
+        self.labels['password'] = pygame_gui.elements.UILabel(
+            relative_rect=password_label_rect,
+            text='Contraseña',
+            manager=self.ui_manager
+        )
+        
+        # 密码输入框
         password_rect = pygame.Rect(center_x - form_width // 2, start_y + 80, form_width,
                                    Theme.get_scaled_size('input_height', self.scale_factor))
-        self.inputs['password'] = ModernInput(
-            password_rect,
-            placeholder="Contraseña",
-            label="Contraseña", 
-            is_password=True,
-            ui_manager=self.ui_manager
+        self.inputs['password'] = pygame_gui.elements.UITextEntryLine(
+            relative_rect=password_rect,
+            placeholder_text="Contraseña",
+            manager=self.ui_manager
+        )
+        self.inputs['password'].set_text_hidden(True)
+        
+        # 确认密码标签
+        confirm_label_rect = pygame.Rect(center_x - form_width // 2, start_y + 160 - 25, form_width, 20)
+        self.labels['confirm_password'] = pygame_gui.elements.UILabel(
+            relative_rect=confirm_label_rect,
+            text='Confirmar contraseña',
+            manager=self.ui_manager
         )
         
-        # 创建密码强度指示器
-        self.password_strength = PasswordStrengthIndicator(self.inputs['password'])
-        
-        # 确认密码输入框（位置会根据密码强度条动态调整）
-        confirm_y = start_y + 160  # 基础位置
-        confirm_rect = pygame.Rect(center_x - form_width // 2, confirm_y, form_width,
+        # 确认密码输入框
+        confirm_rect = pygame.Rect(center_x - form_width // 2, start_y + 160, form_width,
                                   Theme.get_scaled_size('input_height', self.scale_factor))
-        self.inputs['confirm_password'] = ModernInput(
-            confirm_rect,
-            placeholder="Confirmar contraseña",
-            label="Confirmar contraseña",
-            is_password=True,
-            ui_manager=self.ui_manager
+        self.inputs['confirm_password'] = pygame_gui.elements.UITextEntryLine(
+            relative_rect=confirm_rect,
+            placeholder_text="Confirmar contraseña",
+            manager=self.ui_manager
         )
+        self.inputs['confirm_password'].set_text_hidden(True)
         
         # 创建按钮
         button_width = int(form_width * 0.8)
-        register_y = confirm_y + 100
+        register_y = start_y + 260
         register_rect = pygame.Rect(center_x - button_width // 2, register_y, button_width, 
                                    Theme.get_scaled_size('button_height_large', self.scale_factor))
-        self.buttons['register'] = ModernButton(
-            register_rect,
+        self.buttons['register'] = pygame_gui.elements.UIButton(
+            relative_rect=register_rect,
             text="REGISTRARSE",
-            icon="",
-            button_type="primary",
-            font_size="lg"
+            manager=self.ui_manager,
+            object_id='#main_button'
         )
         
         login_rect = pygame.Rect(center_x - button_width // 2, register_y + 80, button_width, 30)
-        self.buttons['login'] = ModernButton(
-            login_rect,
+        self.buttons['login'] = pygame_gui.elements.UIButton(
+            relative_rect=login_rect,
             text="¿Ya tienes una cuenta? Iniciar sesión",
-            button_type="text",
-            font_size="md"
+            manager=self.ui_manager,
+            object_id='#text_button'
         )
-    
-    def update_layout_for_password_strength(self):
-        """根据密码强度条显示状态更新布局"""
-        if not self.password_strength.visible:
-            return
-        
-        screen_width, screen_height = self.screen.get_size()
-        center_x = screen_width // 2
-        form_width = int(min(450 * self.scale_factor, screen_width * 0.8))
-        button_width = int(form_width * 0.8)
-        
-        # 密码强度条高度
-        strength_height = self.password_strength.get_height()
-        
-        # 重新定位确认密码输入框
-        new_confirm_y = self.inputs['password'].rect.bottom + strength_height + Theme.get_scaled_size('spacing_md', self.scale_factor)
-        
-        # 更新确认密码输入框位置
-        old_text = self.inputs['confirm_password'].get_text()
-        self.inputs['confirm_password'].kill()
-        
-        confirm_rect = pygame.Rect(center_x - form_width // 2, new_confirm_y, form_width,
-                                  Theme.get_scaled_size('input_height', self.scale_factor))
-        self.inputs['confirm_password'] = ModernInput(
-            confirm_rect,
-            placeholder="Confirmar contraseña",
-            label="Confirmar contraseña",
-            is_password=True,
-            ui_manager=self.ui_manager
-        )
-        self.inputs['confirm_password'].set_text(old_text)
-        
-        # 更新按钮位置
-        new_register_y = new_confirm_y + 100
-        self.buttons['register'].set_position(center_x - button_width // 2, new_register_y)
-        self.buttons['login'].set_position(center_x - button_width // 2, new_register_y + 80)
     
     def handle_event(self, event):
         """处理事件"""
@@ -232,33 +271,60 @@ class RegisterScene:
         elif event.type == pygame.VIDEORESIZE:
             self.handle_resize(event.size)
         
-        elif event.type == pygame.MOUSEMOTION:
-            # 更新按钮悬停状态
-            for button in self.buttons.values():
-                button.update_hover(event.pos)
-        
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            self.handle_mouse_click(event.pos)
+        elif event.type == pygame_gui.UI_BUTTON_PRESSED:
+            self.handle_button_click(event.ui_element)
         
         elif event.type == pygame_gui.UI_TEXT_ENTRY_CHANGED:
-            # 处理密码输入变化
-            if event.ui_element == self.inputs['password'].ui_element:
-                password = event.text
-                old_visible = self.password_strength.visible
-                self.password_strength.update_strength(password)
-                
-                # 如果密码强度指示器显示状态改变，更新布局
-                if old_visible != self.password_strength.visible:
-                    self.update_layout_for_password_strength()
+            # 处理密码强度检查
+            if event.ui_element == self.inputs['password']:
+                self.update_password_strength(event.text)
         
-        # # 处理输入框事件
-        # for input_comp in self.inputs.values():
-        #     input_comp.handle_event(event)
+        elif event.type == pygame_gui.UI_TEXT_ENTRY_FINISHED:
+            # 处理回车键注册
+            if event.ui_element == self.inputs['confirm_password']:
+                self.handle_register()
         
-        # 处理pygame-gui事件
+        # 处理pygame_gui事件
         self.ui_manager.process_events(event)
         
         return True
+    
+    def update_password_strength(self, password):
+        """更新密码强度提示"""
+        if len(password) == 0:
+            self.password_strength_text = ""
+            self.password_strength_color = (150, 150, 150)
+        elif len(password) < 6:
+            self.password_strength_text = "Muy débil (mínimo 6 caracteres)"
+            self.password_strength_color = (220, 50, 50)
+        elif len(password) < 8:
+            self.password_strength_text = "Débil"
+            self.password_strength_color = (255, 165, 0)
+        else:
+            # 检查复杂性
+            has_upper = any(c.isupper() for c in password)
+            has_lower = any(c.islower() for c in password)
+            has_digit = any(c.isdigit() for c in password)
+            has_special = any(c in "!@#$%^&*()_+-=[]{}|;:,.<>?" for c in password)
+            
+            strength_score = sum([has_upper, has_lower, has_digit, has_special])
+            
+            if strength_score >= 3:
+                self.password_strength_text = "Fuerte"
+                self.password_strength_color = (50, 180, 50)
+            elif strength_score >= 2:
+                self.password_strength_text = "Moderada"
+                self.password_strength_color = (255, 200, 0)
+            else:
+                self.password_strength_text = "Débil"
+                self.password_strength_color = (255, 165, 0)
+    
+    def handle_button_click(self, button):
+        """处理按钮点击"""
+        if button == self.buttons['register']:
+            self.handle_register()
+        elif button == self.buttons['login']:
+            self.handle_login_switch()
     
     def handle_resize(self, new_size):
         """处理窗口大小变化"""
@@ -278,46 +344,57 @@ class RegisterScene:
         # 重新加载Logo
         if self.logo:
             self.load_logo()
-    
-    def handle_mouse_click(self, mouse_pos):
-        """处理鼠标点击"""
-        # 检查按钮点击
-        if self.buttons['register'].is_clicked(mouse_pos, 1):
-            self.buttons['register'].trigger_flash()
-            self.handle_register()
-        elif self.buttons['login'].is_clicked(mouse_pos, 1):
-            self.buttons['login'].trigger_flash()
-            self.handle_login_switch()
+        if self.subtitle_logo:
+            self.load_subtitle_logo()
     
     def handle_register(self):
         """处理注册"""
-        username = self.inputs['username'].ui_element.get_text()
-        password = self.inputs['password'].ui_element.get_text()
-        confirm_password = self.inputs['confirm_password'].ui_element.get_text()
+        username = self.inputs['username'].get_text()
+        password = self.inputs['password'].get_text()
+        confirm_password = self.inputs['confirm_password'].get_text()
         
-        # 清除之前的错误
-        for input_comp in self.inputs.values():
-            input_comp.clear_error()
+        # 简单验证
+        if not username.strip():
+            self.show_error("Por favor ingresa un nombre de usuario")
+            self.inputs['username'].focus()
+            return
         
+        if len(username) < 3:
+            self.show_error("El nombre de usuario debe tener al menos 3 caracteres")
+            self.inputs['username'].focus()
+            return
+        
+        if not password.strip():
+            self.show_error("Por favor ingresa una contraseña")
+            self.inputs['password'].focus()
+            return
+        
+        if len(password) < 6:
+            self.show_error("La contraseña debe tener al menos 6 caracteres")
+            self.inputs['password'].focus()
+            return
+        
+        if password != confirm_password:
+            self.show_error("Las contraseñas no coinciden")
+            self.inputs['confirm_password'].focus()
+            return
+        
+        # 调用认证管理器
         success, message = self.auth_manager.register(username, password, confirm_password)
         
         if success:
             # 显示成功消息
             self.toast_message = ToastMessage(message, "success", 2000)
-            # 开始淡出转换到登录页面
+            # 切换到登录页面
             if self.callback:
                 self.callback("login")
         else:
             # 显示错误消息
-            self.toast_message = ToastMessage(message, "error", 3000)
-            
-            # 根据错误类型设置输入框错误状态
-            if "usuario" in message.lower():
-                self.inputs['username'].set_error("Nombre de usuario inválido")
-            elif "contraseña" in message.lower() and "coinciden" in message.lower():
-                self.inputs['confirm_password'].set_error("Las contraseñas no coinciden")
-            elif "contraseña" in message.lower():
-                self.inputs['password'].set_error("Contraseña inválida")
+            self.show_error(message)
+    
+    def show_error(self, message):
+        """显示错误消息"""
+        self.toast_message = ToastMessage(message, "error", 3000)
     
     def handle_login_switch(self):
         """切换到登录页面"""
@@ -327,20 +404,8 @@ class RegisterScene:
     
     def update(self, dt):
         """更新场景"""
-        # 更新pygame-gui
+        # 更新pygame_gui
         self.ui_manager.update(dt)
-        
-        # # 更新转换动画
-        # if not self.transition_manager.update(dt):
-        #     return False
-        
-        # 更新按钮动画
-        for button in self.buttons.values():
-            button.update_animation(dt)
-        
-        # 更新输入框
-        for input_comp in self.inputs.values():
-            input_comp.update(dt)
         
         # 更新消息管理器
         self.message_manager.update(dt)
@@ -366,19 +431,11 @@ class RegisterScene:
         # 绘制副标题
         self.draw_subtitle()
         
-        # 绘制输入框背景
-        for input_comp in self.inputs.values():
-            input_comp.draw_background(self.screen, self.scale_factor)
-        
-        # 绘制密码强度指示器
-        self.password_strength.draw(self.screen, self.scale_factor)
-        
-        # 绘制pygame-gui元素（输入框）
+        # 绘制pygame_gui UI
         self.ui_manager.draw_ui(self.screen)
         
-        # 绘制按钮
-        for button in self.buttons.values():
-            button.draw(self.screen, self.scale_factor)
+        # 绘制密码强度提示
+        self.draw_password_strength()
         
         # 绘制消息
         self.message_manager.draw(self.screen, self.scale_factor)
@@ -387,9 +444,23 @@ class RegisterScene:
         if self.toast_message:
             screen_width, screen_height = self.screen.get_size()
             self.toast_message.draw(self.screen, screen_width // 2, int(screen_height * 0.8), self.scale_factor)
-        
-        # 绘制转换效果
-        # self.transition_manager.draw()
+    
+    def draw_password_strength(self):
+        """绘制密码强度提示"""
+        if self.password_strength_text:
+            screen_width, screen_height = self.screen.get_size()
+            form_width = int(min(450 * self.scale_factor, screen_width * 0.8))
+            center_x = screen_width // 2
+            start_y = int(screen_height * 0.35)
+            
+            # 在密码输入框下方显示强度
+            text_y = start_y + 80 + Theme.get_scaled_size('input_height', self.scale_factor) + 5
+            
+            text_surface = font_manager.render_text(
+                self.password_strength_text, 'sm', screen_height, self.password_strength_color
+            )
+            text_rect = text_surface.get_rect(topleft=(center_x - form_width // 2, text_y))
+            self.screen.blit(text_surface, text_rect)
     
     def draw_background(self):
         """绘制背景"""
@@ -426,80 +497,47 @@ class RegisterScene:
             self.screen.blit(title_surface, title_rect)
     
     def draw_subtitle(self):
-        """绘制现代化副标题"""
+        """绘制副标题"""
         screen_width, screen_height = self.screen.get_size()
         
-        # 副标题文字
-        subtitle_text = "Juego de Cartas Coleccionables"
-        text_color = Theme.get_color('text_white')
-        text_surface = font_manager.render_text(subtitle_text, 'md', screen_height, text_color)
-        
-        # 位置
-        text_rect = text_surface.get_rect(center=(screen_width // 2, int(screen_height * 0.26)))
-        
-        # 现代化背景条
-        padding = Theme.get_scaled_size('spacing_lg', self.scale_factor)
-        bg_rect = text_rect.inflate(padding * 2, Theme.get_scaled_size('spacing_md', self.scale_factor))
-        
-        # 绘制毛玻璃背景
-        self.draw_glass_background(bg_rect)
-        
-        # 绘制文字
-        shadow_color = (100, 20, 20)
-        shadow_surface = font_manager.render_text(subtitle_text, 'md', screen_height, shadow_color)
-        self.screen.blit(shadow_surface, text_rect.move(2, 2))
-        self.screen.blit(text_surface, text_rect)
-    
-    def draw_glass_background(self, rect):
-        """绘制毛玻璃背景"""
-        radius = Theme.get_scaled_size('border_radius_medium', self.scale_factor)
-        
-        # 阴影
-        shadow_rect = rect.move(4, 4)
-        self.draw_rounded_rect_alpha(shadow_rect, radius, (0, 0, 0, 40))
-        
-        # 主背景 - 红色渐变
-        bg_surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-        
-        for y in range(rect.height):
-            progress = y / rect.height
-            r = int(220 * (1 - progress * 0.2))
-            g = int(50 * (1 - progress * 0.1))
-            b = int(50 * (1 - progress * 0.1))
-            pygame.draw.line(bg_surface, (r, g, b), (0, y), (rect.width, y))
-        
-        # 应用圆角
-        mask = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-        pygame.draw.rect(mask, (255, 255, 255), (0, 0, rect.width, rect.height), border_radius=radius)
-        
-        final_bg = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-        final_bg.blit(bg_surface, (0, 0))
-        final_bg.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
-        
-        self.screen.blit(final_bg, rect.topleft)
-        
-        # 顶部高光
-        highlight_rect = pygame.Rect(rect.x + 2, rect.y + 2, rect.width - 4, rect.height // 2)
-        self.draw_rounded_rect_alpha(highlight_rect, radius - 2, (255, 255, 255, 40))
-    
-    def draw_rounded_rect_alpha(self, rect, radius, color):
-        """绘制带透明度的圆角矩形"""
-        if len(color) == 4:
-            surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-            pygame.draw.rect(surface, color, (0, 0, rect.width, rect.height), border_radius=radius)
-            self.screen.blit(surface, rect.topleft)
+        if self.subtitle_logo:
+            # 使用图片
+            logo_rect = self.subtitle_logo.get_rect(center=(screen_width // 2, int(screen_height * 0.26)))
+            self.screen.blit(self.subtitle_logo, logo_rect)
         else:
-            pygame.draw.rect(self.screen, color, rect, border_radius=radius)
+            # 文字后备方案
+            subtitle_text = "Juego de Cartas Coleccionables"
+            text_color = Theme.get_color('text_white')
+            text_surface = font_manager.render_text(subtitle_text, 'md', screen_height, text_color)
+            
+            # 位置
+            text_rect = text_surface.get_rect(center=(screen_width // 2, int(screen_height * 0.26)))
+            
+            # 简化的背景
+            padding = Theme.get_scaled_size('spacing_lg', self.scale_factor)
+            bg_rect = text_rect.inflate(padding * 2, Theme.get_scaled_size('spacing_md', self.scale_factor))
+            
+            # 绘制简单背景
+            bg_surface = pygame.Surface((bg_rect.width, bg_rect.height), pygame.SRCALPHA)
+            bg_surface.fill((220, 50, 50, 150))  # 半透明红色
+            self.screen.blit(bg_surface, bg_rect.topleft)
+            
+            # 绘制文字
+            self.screen.blit(text_surface, text_rect)
     
     def cleanup(self):
         """清理资源"""
-        # 清理输入框
-        for input_comp in self.inputs.values():
-            input_comp.kill()
-        
         # 清理视频背景
         if self.video_background:
             self.video_background.close()
+        
+        # 清理主题文件
+        try:
+            os.remove('register_theme.json')
+        except:
+            pass
+            
+        print("✅ 注册场景资源清理完成")
     
     def run(self):
         """运行场景的主循环（独立运行时使用）"""

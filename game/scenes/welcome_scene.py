@@ -1,18 +1,16 @@
 """
-引导欢迎场景
-包含登录、注册、退出三个选项的主入口页面
+重构后的引导欢迎场景
+使用pygame_gui替代自定义UI组件
 """
 
 import pygame
 import pygame_gui
-import math
+import json
 import sys
 import os
 
-# 导入组件和样式
-from game.scenes.components.button_component import ModernButton
+# 导入核心模块
 from game.scenes.components.message_component import MessageManager, ToastMessage
-# from game.scenes.animations.transitions import FadeTransition
 from game.scenes.styles.theme import Theme
 from game.scenes.styles.fonts import font_manager
 from game.utils.video_background import VideoBackground
@@ -34,9 +32,11 @@ class WelcomeScene:
         # 缩放因子
         self.scale_factor = min(screen.get_width() / 1920, screen.get_height() / 1080)
         
+        # 创建pygame_gui主题并初始化UI管理器
+        self.setup_pygame_gui()
+        
         # 组件管理器
         self.message_manager = MessageManager()
-        # self.transition_manager = FadeTransition(screen)
         
         # UI组件
         self.buttons = {}
@@ -44,7 +44,7 @@ class WelcomeScene:
 
         # 确认退出对话框状态
         self.show_exit_dialog = False
-        self.exit_dialog_buttons = {}  # 👈 添加这行
+        self.exit_dialog_elements = {}
         
         # 背景
         self.background_surface = None
@@ -54,34 +54,102 @@ class WelcomeScene:
         # Logo
         self.logo = None
         self.load_logo()
+
+        # 副标题Logo
+        self.subtitle_logo = None
+        self.load_subtitle_logo()
         
         # 引导层状态
         self.show_intro = True
         self.intro_alpha = 255
         self.intro_time = 0
         self.transition_intro = False
-        self.get_to_daze_text = "Presiona cualquier tecla para comenzar"
-
-        # 按钮动画状态
-        self.buttons_animation_started = False
-        self.buttons_animation_progress = 0.0
-        self.button_offsets = {}  # 存储每个按钮的偏移量
+        self.intro_text = "Presiona cualquier tecla para comenzar"
 
         # 设置UI元素
         self.setup_ui_elements()
         
-        # # 开始淡入动画
-        # self.transition_manager.start_fade_in()
-
-        # # 使用传入的转换管理器，如果没有就创建自己的
-        # if transition_manager:
-        #     self.transition_manager = transition_manager
-        #     print("🔗 使用共享转换管理器")
-        # else:
-        #     self.transition_manager = FadeTransition(screen)
-        #     print("🆕 创建新的转换管理器")
-        
         print("✅ 欢迎场景初始化完成")
+    
+    def setup_pygame_gui(self):
+        """设置pygame_gui主题和管理器"""
+        # 创建主题数据
+        theme_data = {
+            "#main_button": {
+                "colours": {
+                    "normal_bg": "#5865F2",
+                    "hovered_bg": "#4338D8",
+                    "selected_bg": "#4338D8",
+                    "active_bg": "#4338D8",
+                    "normal_border": "#7C84FF",
+                    "hovered_border": "#3730A3",
+                    "selected_border": "#3730A3",
+                    "active_border": "#3730A3",
+                    "normal_text": "#FFFFFF",
+                    "hovered_text": "#FFFFFF",
+                    "selected_text": "#FFFFFF",
+                    "active_text": "#FFFFFF"
+                },
+                "font": {
+                    "name": "arial",
+                    "size": "20",
+                    "bold": "0"
+                },
+                "font:hovered": {
+                    "name": "arial",
+                    "size": "20",
+                    "bold": "1"
+                },
+                "misc": {
+                    "shape": "rounded_rectangle",
+                    "shape_corner_radius": "16",
+                    "border_width": "3",
+                    "shadow_width": "0"
+                }
+            },
+            "#secondary_button": {
+                "colours": {
+                    "normal_bg": "#FFFFFF",
+                    "hovered_bg": "#F1F5F9",
+                    "selected_bg": "#F1F5F9",
+                    "active_bg": "#F1F5F9",
+                    "normal_border": "#E5E7EB",
+                    "hovered_border": "#94A3B8",
+                    "selected_border": "#94A3B8",
+                    "active_border": "#94A3B8",
+                    "normal_text": "#5865F2",
+                    "hovered_text": "#3730A3",
+                    "selected_text": "#3730A3",
+                    "active_text": "#3730A3"
+                },
+                "font": {
+                    "name": "arial",
+                    "size": "18",
+                    "bold": "0"
+                },
+                "font:hovered": {
+                    "name": "arial",
+                    "size": "18",
+                    "bold": "1"
+                },
+                "misc": {
+                    "shape": "rounded_rectangle",
+                    "shape_corner_radius": "12",
+                    "border_width": "3",
+                    "shadow_width": "0"
+                }
+            }
+        }
+        
+        # 保存主题文件
+        with open('welcome_theme.json', 'w') as f:
+            json.dump(theme_data, f, indent=2)
+        
+        # 创建UI管理器
+        self.ui_manager = pygame_gui.UIManager(
+            self.screen.get_size(), 
+            theme_path='welcome_theme.json'
+        )
     
     def setup_background(self):
         """设置背景效果"""
@@ -127,6 +195,20 @@ class WelcomeScene:
                 print("✅ Logo加载成功")
         except Exception as e:
             print(f"⚠️ Logo加载失败: {e}")
+
+    def load_subtitle_logo(self):
+        """加载副标题Logo"""
+        try:
+            logo_path = os.path.join("assets", "images", "logo", "secondLogo.png")
+            if os.path.exists(logo_path):
+                self.subtitle_logo = pygame.image.load(logo_path)
+                # 调整副标题Logo大小
+                logo_width = int(self.screen.get_width() * 0.25)
+                logo_height = int(logo_width * (self.subtitle_logo.get_height() / self.subtitle_logo.get_width()))
+                self.subtitle_logo = pygame.transform.smoothscale(self.subtitle_logo, (logo_width, logo_height))
+                print("✅ 副标题Logo加载成功")
+        except Exception as e:
+            print(f"⚠️ 副标题Logo加载失败: {e}")
     
     def setup_ui_elements(self):
         """设置UI元素"""
@@ -141,45 +223,39 @@ class WelcomeScene:
         
         # 创建主要按钮
         login_rect = pygame.Rect(center_x - button_width // 2, start_y, button_width, button_height)
-        self.buttons['login'] = ModernButton(
-            login_rect,
-            text="INICIAR SESIÓN",
-            icon="",
-            button_type="primary",
-            font_size="lg"
+        self.buttons['login'] = pygame_gui.elements.UIButton(
+            relative_rect=login_rect,
+            text='INICIAR SESIÓN',
+            manager=self.ui_manager,
+            object_id='#main_button'
         )
         
         register_rect = pygame.Rect(center_x - button_width // 2, start_y + button_spacing, button_width, button_height)
-        self.buttons['register'] = ModernButton(
-            register_rect,
-            text="CREAR CUENTA",
-            icon="",
-            button_type="secondary",
-            font_size="lg"
+        self.buttons['register'] = pygame_gui.elements.UIButton(
+            relative_rect=register_rect,
+            text='CREAR CUENTA',
+            manager=self.ui_manager,
+            object_id='#secondary_button'
         )
         
         exit_rect = pygame.Rect(center_x - button_width // 2, start_y + button_spacing * 2, button_width, button_height)
-        self.buttons['exit'] = ModernButton(
-            exit_rect,
-            text="SALIR",
-            icon="",
-            button_type="secondary",
-            font_size="lg"
+        self.buttons['exit'] = pygame_gui.elements.UIButton(
+            relative_rect=exit_rect,
+            text='SALIR',
+            manager=self.ui_manager,
+            object_id='#secondary_button'
         )
         
-        # 设置按钮初始偏移（从下方飞入）
-        screen_height = self.screen.get_height()
-        self.button_offsets = {
-            'login': screen_height,      # 登录按钮从最下方
-            'register': screen_height + 50,  # 注册按钮稍微延迟
-            'exit': screen_height + 100      # 退出按钮最后出现
-        }
+        # 初始隐藏按钮（引导层期间）
+        if self.show_intro:
+            for button in self.buttons.values():
+                button.hide()
 
-        # 退出确认对话框按钮（初始化但不显示）
-        self.setup_exit_dialog_buttons()
+        # 设置退出确认对话框
+        self.setup_exit_dialog()
     
-    def setup_exit_dialog_buttons(self):
-        """设置退出确认对话框按钮"""
+    def setup_exit_dialog(self):
+        """设置退出确认对话框"""
         screen_width, screen_height = self.screen.get_size()
         
         dialog_width = int(min(500 * self.scale_factor, screen_width * 0.8))
@@ -187,27 +263,51 @@ class WelcomeScene:
         dialog_x = (screen_width - dialog_width) // 2
         dialog_y = (screen_height - dialog_height) // 2
         
+        # 创建对话框面板
+        self.exit_dialog_elements['panel'] = pygame_gui.elements.UIPanel(
+            relative_rect=pygame.Rect(dialog_x, dialog_y, dialog_width, dialog_height),
+            manager=self.ui_manager
+        )
+        
+        # 标题标签
+        self.exit_dialog_elements['title'] = pygame_gui.elements.UILabel(
+            relative_rect=pygame.Rect(20, 20, dialog_width - 40, 40),
+            text='Confirmar salida',
+            container=self.exit_dialog_elements['panel'],
+            manager=self.ui_manager
+        )
+        
+        # 消息标签
+        self.exit_dialog_elements['message'] = pygame_gui.elements.UILabel(
+            relative_rect=pygame.Rect(20, 70, dialog_width - 40, 60),
+            text='¿Estás seguro de que quieres salir del juego?',
+            container=self.exit_dialog_elements['panel'],
+            manager=self.ui_manager
+        )
+        
+        # 按钮
         button_width = int(dialog_width * 0.35)
         button_height = Theme.get_scaled_size('button_height_medium', self.scale_factor)
-        button_y = dialog_y + dialog_height - button_height - 20
+        button_y = dialog_height - button_height - 20
         
-        # 确认退出按钮
-        yes_rect = pygame.Rect(dialog_x + 20, button_y, button_width, button_height)
-        self.exit_dialog_buttons['yes'] = ModernButton(
-            yes_rect,
-            text="SÍ, SALIR",
-            button_type="primary",
-            font_size="md"
+        self.exit_dialog_elements['yes'] = pygame_gui.elements.UIButton(
+            relative_rect=pygame.Rect(20, button_y, button_width, button_height),
+            text='SÍ, SALIR',
+            container=self.exit_dialog_elements['panel'],
+            manager=self.ui_manager,
+            object_id='#main_button'
         )
         
-        # 取消按钮
-        no_rect = pygame.Rect(dialog_x + dialog_width - button_width - 20, button_y, button_width, button_height)
-        self.exit_dialog_buttons['no'] = ModernButton(
-            no_rect,
-            text="CANCELAR",
-            button_type="secondary",
-            font_size="md"
+        self.exit_dialog_elements['no'] = pygame_gui.elements.UIButton(
+            relative_rect=pygame.Rect(dialog_width - button_width - 20, button_y, button_width, button_height),
+            text='CANCELAR',
+            container=self.exit_dialog_elements['panel'],
+            manager=self.ui_manager,
+            object_id='#secondary_button'
         )
+        
+        # 初始隐藏对话框
+        self.exit_dialog_elements['panel'].hide()
     
     def handle_event(self, event):
         """处理事件"""
@@ -228,6 +328,7 @@ class WelcomeScene:
         if event.type == pygame.QUIT:
             if not self.show_exit_dialog:
                 self.show_exit_dialog = True
+                self.exit_dialog_elements['panel'].show()
                 return True
             else:
                 return False
@@ -239,27 +340,39 @@ class WelcomeScene:
             if event.key == pygame.K_ESCAPE:
                 if self.show_exit_dialog:
                     self.show_exit_dialog = False
+                    self.exit_dialog_elements['panel'].hide()
                 else:
                     self.show_exit_dialog = True
+                    self.exit_dialog_elements['panel'].show()
                 return True
         
-        elif event.type == pygame.MOUSEMOTION:
-            # 更新按钮悬停状态
-            if self.show_exit_dialog:
-                for button in self.exit_dialog_buttons.values():
-                    button.update_hover(event.pos)
-            else:
-                for button in self.buttons.values():
-                    button.update_hover(event.pos)
+        elif event.type == pygame_gui.UI_BUTTON_PRESSED:
+            self.handle_button_click(event.ui_element)
         
-        elif event.type == pygame.MOUSEBUTTONDOWN and event.button == 1:
-            self.handle_mouse_click(event.pos)
+        # 处理pygame_gui事件
+        self.ui_manager.process_events(event)
         
         return True
+    
+    def handle_button_click(self, button):
+        """处理按钮点击"""
+        if self.show_exit_dialog:
+            if button == self.exit_dialog_elements['yes']:
+                self.handle_exit_confirm()
+            elif button == self.exit_dialog_elements['no']:
+                self.handle_exit_cancel()
+        else:
+            if button == self.buttons['login']:
+                self.handle_login_click()
+            elif button == self.buttons['register']:
+                self.handle_register_click()
+            elif button == self.buttons['exit']:
+                self.handle_exit_click()
     
     def handle_resize(self, new_size):
         """处理窗口大小变化"""
         self.screen = pygame.display.set_mode(new_size, pygame.RESIZABLE)
+        self.ui_manager.set_window_resolution(new_size)
         self.scale_factor = min(new_size[0] / 1920, new_size[1] / 1080)
         
         # 重新创建背景
@@ -275,49 +388,15 @@ class WelcomeScene:
         if self.logo:
             self.load_logo()
     
-    def handle_mouse_click(self, mouse_pos):
-        """处理鼠标点击"""
-        if self.show_exit_dialog:
-            # 处理退出对话框按钮点击
-            if self.exit_dialog_buttons['yes'].is_clicked(mouse_pos, 1):
-                self.exit_dialog_buttons['yes'].trigger_flash()
-                self.handle_exit_confirm()
-            elif self.exit_dialog_buttons['no'].is_clicked(mouse_pos, 1):
-                self.exit_dialog_buttons['no'].trigger_flash()
-                self.handle_exit_cancel()
-        elif not self.show_intro and self.buttons_animation_progress > 0.8:  # 动画基本完成后才能点击
-            # 调整鼠标位置以匹配按钮动画偏移
-            adjusted_mouse_pos = list(mouse_pos)
-            
-            for button_name, button in self.buttons.items():
-                if button_name in self.button_offsets:
-                    offset_y = self.button_offsets[button_name]
-                    adjusted_rect = button.rect.copy()
-                    adjusted_rect.y += int(offset_y)
-                    
-                    if adjusted_rect.collidepoint(mouse_pos):
-                        if button_name == 'login':
-                            button.trigger_flash()
-                            self.handle_login_click()
-                        elif button_name == 'register':
-                            button.trigger_flash()
-                            self.handle_register_click()
-                        elif button_name == 'exit':
-                            button.trigger_flash()
-                            self.handle_exit_click()
-                        break
-    
     def handle_login_click(self):
         """处理登录按钮点击"""
         print("🔐 用户点击登录按钮")
-        # 直接调用回调，不需要复杂的转换逻辑
         if self.callback:
             self.callback("login")
 
     def handle_register_click(self):
         """处理注册按钮点击"""
         print("✨ 用户点击注册按钮")
-        # 直接调用回调
         if self.callback:
             self.callback("register")
     
@@ -325,11 +404,11 @@ class WelcomeScene:
         """处理退出按钮点击"""
         print("🚪 用户点击退出按钮")
         self.show_exit_dialog = True
+        self.exit_dialog_elements['panel'].show()
     
     def handle_exit_confirm(self):
         """处理确认退出"""
         print("✅ 用户确认退出游戏")
-        # 直接执行退出，不要Toast延迟
         if self.callback:
             self.callback("exit")
     
@@ -337,6 +416,7 @@ class WelcomeScene:
         """处理取消退出"""
         print("❌ 用户取消退出")
         self.show_exit_dialog = False
+        self.exit_dialog_elements['panel'].hide()
         self.toast_message = ToastMessage("Operación cancelada", "info", 1000)
     
     def update(self, dt):
@@ -359,41 +439,15 @@ class WelcomeScene:
                     self.intro_alpha = 0
                     self.show_intro = False
                     self.transition_intro = False
-                    self.buttons_animation_started = True  # 开始按钮动画
+                    # 显示按钮
+                    for button in self.buttons.values():
+                        button.show()
             
             return True
         
-        # 更新按钮飞入动画
-        if self.buttons_animation_started and self.buttons_animation_progress < 1.0:
-            # 使用easeOutBack缓动函数
-            animation_speed = 2.5  # 动画速度
-            self.buttons_animation_progress = min(1.0, self.buttons_animation_progress + dt * animation_speed)
-            
-            # 计算每个按钮的当前偏移
-            for button_name in self.button_offsets:
-                # 添加延迟效果
-                delay_factor = {'login': 0.0, 'register': 0.1, 'exit': 0.2}[button_name]
-                progress = max(0, self.buttons_animation_progress - delay_factor)
-                progress = min(1.0, progress / (1.0 - delay_factor)) if delay_factor < 1.0 else progress
-                
-                # easeOutBack缓动
-                if progress > 0:
-                    c1 = 1.70158
-                    c3 = c1 + 1
-                    eased = 1 + c3 * pow(progress - 1, 3) + c1 * pow(progress - 1, 2)
-                    self.button_offsets[button_name] = self.screen.get_height() * (1 - eased)
-                else:
-                    self.button_offsets[button_name] = self.screen.get_height()
+        # 更新pygame_gui
+        self.ui_manager.update(dt)
         
-        # 原有的其他更新逻辑...
-        if self.show_exit_dialog:
-            for button in self.exit_dialog_buttons.values():
-                button.update_animation(dt)
-        else:
-            for button in self.buttons.values():
-                button.update_animation(dt)
-    
-
         # 更新消息管理器
         self.message_manager.update(dt)
         
@@ -418,17 +472,13 @@ class WelcomeScene:
         # 绘制副标题
         self.draw_subtitle()
         
-        # 绘制按钮（带飞入动画）
-        if not self.show_exit_dialog and not self.show_intro:
-            self.draw_animated_buttons()
+        # 绘制pygame_gui UI
+        if not self.show_intro:
+            self.ui_manager.draw_ui(self.screen)
         
         # 绘制引导层文字
         if self.show_intro:
             self.draw_intro_text()
-        
-        # 绘制退出确认对话框
-        if self.show_exit_dialog:
-            self.draw_exit_dialog()
         
         # 绘制消息
         self.message_manager.draw(self.screen, self.scale_factor)
@@ -438,29 +488,8 @@ class WelcomeScene:
             screen_width, screen_height = self.screen.get_size()
             self.toast_message.draw(self.screen, screen_width // 2, int(screen_height * 0.85), self.scale_factor)
 
-    def draw_animated_buttons(self):
-        """绘制带动画的按钮"""
-        for button_name, button in self.buttons.items():
-            if button_name in self.button_offsets:
-                # 计算按钮当前位置
-                offset_y = self.button_offsets[button_name]
-                
-                # 如果按钮还在屏幕外，不绘制
-                if offset_y >= self.screen.get_height():
-                    continue
-                
-                # 临时修改按钮位置
-                original_y = button.rect.y
-                button.rect.y += int(offset_y)
-                
-                # 绘制按钮
-                button.draw(self.screen, self.scale_factor)
-                
-                # 恢复原始位置（用于事件处理）
-                button.rect.y = original_y
-
     def draw_intro_text(self):
-        """绘制引导文字（不要覆盖层）"""
+        """绘制引导文字"""
         screen_width, screen_height = self.screen.get_size()
         
         # 在按钮位置显示引导文字
@@ -469,7 +498,7 @@ class WelcomeScene:
         
         text_color = (255, 255, 255)
         text_surface = font_manager.render_text(
-            self.get_to_daze_text, 'xl', screen_height, text_color
+            self.intro_text, 'xl', screen_height, text_color
         )
         text_surface.set_alpha(int(self.intro_alpha))
         text_rect = text_surface.get_rect(center=(screen_width // 2, text_y))
@@ -510,118 +539,46 @@ class WelcomeScene:
             self.screen.blit(title_surface, title_rect)
     
     def draw_subtitle(self):
-        """绘制现代化副标题"""
+        """绘制副标题"""
         screen_width, screen_height = self.screen.get_size()
         
-        # 副标题文字
-        subtitle_text = "JUEGO DE CARTAS COLECCIONABLES"
-        text_color = Theme.get_color('text_white')
-        text_surface = font_manager.render_text(subtitle_text, 'lg', screen_height, text_color)
-        
-        # 位置
-        text_rect = text_surface.get_rect(center=(screen_width // 2, int(screen_height * 0.4)))
-        
-        # 现代化背景条
-        padding = Theme.get_scaled_size('spacing_xl', self.scale_factor)
-        bg_rect = text_rect.inflate(padding * 2, Theme.get_scaled_size('spacing_lg', self.scale_factor))
-        
-        # 绘制毛玻璃背景
-        self.draw_glass_background(bg_rect)
-        
-        # 绘制文字
-        shadow_color = (0, 0, 0, 120)
-        shadow_surface = font_manager.render_text(subtitle_text, 'lg', screen_height, shadow_color[:3])
-        self.screen.blit(shadow_surface, text_rect.move(2, 2))
-        self.screen.blit(text_surface, text_rect)
-    
-    def draw_exit_dialog(self):
-        """绘制退出确认对话框"""
-        screen_width, screen_height = self.screen.get_size()
-        
-        # 对话框尺寸
-        dialog_width = int(min(400 * self.scale_factor, screen_width * 0.7))
-        dialog_height = int(min(200 * self.scale_factor, screen_height * 0.4))
-        dialog_x = (screen_width - dialog_width) // 2
-        dialog_y = (screen_height - dialog_height) // 2
-        dialog_rect = pygame.Rect(dialog_x, dialog_y, dialog_width, dialog_height)
-        
-        # 半透明覆盖层
-        overlay = pygame.Surface((screen_width, screen_height), pygame.SRCALPHA)
-        overlay.fill((0, 0, 0, 150))
-        self.screen.blit(overlay, (0, 0))
-        
-        # 对话框背景
-        self.draw_glass_background(dialog_rect, opacity=240)
-        
-        # 对话框边框
-        pygame.draw.rect(self.screen, Theme.get_color('border'), dialog_rect, 2, 
-                        border_radius=Theme.get_scaled_size('border_radius_large', self.scale_factor))
-        
-        # 标题
-        title_text = "Confirmar salida"
-        title_color = Theme.get_color('text')
-        title_surface = font_manager.render_text(title_text, 'xl', screen_height, title_color)
-        title_rect = title_surface.get_rect(center=(dialog_rect.centerx, dialog_y + 40))
-        self.screen.blit(title_surface, title_rect)
-        
-        # 消息文本
-        message_text = "¿Estás seguro de que quieres salir del juego?"
-        message_color = Theme.get_color('text_secondary')
-        message_surface = font_manager.render_text(message_text, 'md', screen_height, message_color)
-        message_rect = message_surface.get_rect(center=(dialog_rect.centerx, dialog_y + 90))
-        self.screen.blit(message_surface, message_rect)
-        
-        # 绘制对话框按钮
-        for button in self.exit_dialog_buttons.values():
-            button.draw(self.screen, self.scale_factor)
-    
-    def draw_glass_background(self, rect, opacity=200):
-        """绘制毛玻璃背景"""
-        radius = Theme.get_scaled_size('border_radius_large', self.scale_factor)
-        
-        # 阴影
-        shadow_rect = rect.move(6, 6)
-        self.draw_rounded_rect_alpha(shadow_rect, radius, (0, 0, 0, 60))
-        
-        # 主背景 - 渐变效果
-        bg_surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-        
-        for y in range(rect.height):
-            progress = y / rect.height
-            alpha = int(opacity * (1 - progress * 0.3))
-            r = int(255 * (1 - progress * 0.1))
-            g = int(255 * (1 - progress * 0.05))
-            b = int(255 * (1 - progress * 0.05))
-            pygame.draw.line(bg_surface, (r, g, b, alpha), (0, y), (rect.width, y))
-        
-        # 应用圆角
-        mask = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-        pygame.draw.rect(mask, (255, 255, 255), (0, 0, rect.width, rect.height), border_radius=radius)
-        
-        final_bg = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-        final_bg.blit(bg_surface, (0, 0))
-        final_bg.blit(mask, (0, 0), special_flags=pygame.BLEND_RGBA_MIN)
-        
-        self.screen.blit(final_bg, rect.topleft)
-        
-        # 顶部高光
-        highlight_rect = pygame.Rect(rect.x + 2, rect.y + 2, rect.width - 4, rect.height // 3)
-        self.draw_rounded_rect_alpha(highlight_rect, radius - 2, (255, 255, 255, 50))
-    
-    def draw_rounded_rect_alpha(self, rect, radius, color):
-        """绘制带透明度的圆角矩形"""
-        if len(color) == 4:
-            surface = pygame.Surface((rect.width, rect.height), pygame.SRCALPHA)
-            pygame.draw.rect(surface, color, (0, 0, rect.width, rect.height), border_radius=radius)
-            self.screen.blit(surface, rect.topleft)
+        if self.subtitle_logo:
+            # 使用图片
+            logo_rect = self.subtitle_logo.get_rect(center=(screen_width // 2, int(screen_height * 0.4)))
+            self.screen.blit(self.subtitle_logo, logo_rect)
         else:
-            pygame.draw.rect(self.screen, color, rect, border_radius=radius)
+            # 副标题文字
+            subtitle_text = "JUEGO DE CARTAS COLECCIONABLES"
+            text_color = Theme.get_color('text_white')
+            text_surface = font_manager.render_text(subtitle_text, 'lg', screen_height, text_color)
+            
+            # 位置
+            text_rect = text_surface.get_rect(center=(screen_width // 2, int(screen_height * 0.4)))
+            
+            # 简化的背景（不要毛玻璃效果）
+            padding = Theme.get_scaled_size('spacing_xl', self.scale_factor)
+            bg_rect = text_rect.inflate(padding * 2, Theme.get_scaled_size('spacing_lg', self.scale_factor))
+            
+            # 绘制简单背景
+            bg_surface = pygame.Surface((bg_rect.width, bg_rect.height), pygame.SRCALPHA)
+            bg_surface.fill((0, 0, 0, 100))  # 半透明黑色
+            self.screen.blit(bg_surface, bg_rect.topleft)
+            
+            # 绘制文字
+            self.screen.blit(text_surface, text_rect)
     
     def cleanup(self):
         """清理资源"""
         # 清理视频背景
         if self.video_background:
             self.video_background.close()
+        
+        # 清理主题文件
+        try:
+            os.remove('welcome_theme.json')
+        except:
+            pass
+            
         print("✅ 欢迎场景资源清理完成")
     
     def run(self):

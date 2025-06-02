@@ -7,6 +7,7 @@ import os
 import sys
 import random
 from typing import Optional, Callable
+from game.core.database.database_manager import DatabaseManager
 
 # 导入PIL处理GIF动画
 try:
@@ -18,9 +19,10 @@ except ImportError:
 
 # 导入窗口类
 try:
-    from game.scenes.windows.package import ModernPackageWindow
+    from game.scenes.windows.package import PackageWindow
     from game.scenes.windows.e_magica import EMagicaWindow
-    from game.scenes.windows.tienda import ModernTiendaWindow
+    from game.scenes.windows.tienda.tienda_modern import ModernTiendaWindow
+
     WINDOWS_AVAILABLE = True
     print("✅ 窗口模块导入成功")
 except ImportError as e:
@@ -35,7 +37,7 @@ class HomePage:
     横屏布局版本 - 使用pygame_gui重构 + 弹出窗口支持
     """
     
-    def __init__(self, screen_width: int, screen_height: int, nav_bar_height: int = 100):
+    def __init__(self, screen_width: int, screen_height: int, ui_manager, nav_bar_height: int = 100):
         """
         初始化主页
         
@@ -51,18 +53,16 @@ class HomePage:
         # 计算内容区域（排除导航栏）
         self.content_height = screen_height - nav_bar_height
         self.content_rect = pygame.Rect(0, 0, screen_width, self.content_height)
+
+        self.ui_manager = ui_manager
+
+        # 初始化db管理器
+        self.db_manager = DatabaseManager()
+        if hasattr(self.db_manager, "card_dao"):
+            self.db_manager.card_dao.create_card_tables()
+        if hasattr(self.db_manager, "user_dao"):
+            self.db_manager.user_dao.create_user_table()
         
-        # 添加窗口管理状态
-        self.window_manager_callback = None  # 窗口管理器回调
-        self.external_message_manager = None  # 外部消息管理器
-
-        # 窗口状态跟踪
-        self.window_states = {
-            'package': {'is_open': False, 'last_opened': None},
-            'e_magica': {'is_open': False, 'last_opened': None},
-            'tienda': {'is_open': False, 'last_opened': None}
-        }
-
         # 基准尺寸（1344x756）
         self.base_width = 1344
         self.base_height = 756
@@ -95,7 +95,7 @@ class HomePage:
         self.fonts = self.load_fonts()
         
         # 创建pygame_gui管理器
-        self.ui_manager = pygame_gui.UIManager((screen_width, self.content_height))
+        # self.ui_manager = pygame_gui.UIManager((screen_width, self.content_height))
         
         # 加载现代主题
         self.setup_ui_theme()
@@ -164,6 +164,13 @@ class HomePage:
         
         # 创建布局
         self.create_layout()
+
+        print(f"[注册检查] 所有 UI 元素: {[str(s) for s in self.ui_manager.get_sprite_group().sprites()]}")
+        print(f"[注册检查] shop_button 是否存在: {self.ui_elements['shop_button'] in self.ui_manager.get_sprite_group().sprites()}")
+        print(f"[按钮位置] shop_button.rect = {self.ui_elements['shop_button'].relative_rect}")
+        print(f"[调试] UIManager id in HomePage: {id(self.ui_manager)}")
+
+
     
     def load_fonts(self):
         """加载字体"""
@@ -256,30 +263,6 @@ class HomePage:
         }
         
         self.ui_manager.get_theme().load_theme(theme_data)
-
-    def set_window_manager_callback(self, callback: Callable):
-        """设置窗口管理器回调"""
-        self.window_manager_callback = callback
-        print("✅ 窗口管理器回调已设置")
-    
-    def set_external_message_manager(self, message_manager):
-        """设置外部消息管理器"""
-        self.external_message_manager = message_manager
-        print("✅ 外部消息管理器已设置")
-    
-    def show_message(self, message: str, msg_type: str = "info", duration: float = 3.0):
-        """显示消息（使用外部消息管理器优先）"""
-        if self.external_message_manager:
-            if msg_type == "info":
-                self.external_message_manager.add_info(message, duration)
-            elif msg_type == "success":
-                self.external_message_manager.add_success(message, duration)
-            elif msg_type == "warning":
-                self.external_message_manager.add_warning(message, duration)
-            elif msg_type == "error":
-                self.external_message_manager.add_error(message, duration)
-        else:
-            print(f"📨 {msg_type.upper()}: {message}")
     
     def load_pack_images(self):
         """加载卡包图片并随机选择3张"""
@@ -378,7 +361,7 @@ class HomePage:
         # 左侧卡包区域 - 使用弹性布局
         pack_area_width = int(self.screen_width * 0.65)
         pack_width = scaled(180)  # 再次放大卡包
-        pack_height = scaled(250)  # 再次放大卡包
+        pack_height = scaled(300)  # 再次放大卡包
         
         # 减小卡包间距到30像素（比例化）
         pack_spacing = scaled(30)
@@ -478,6 +461,7 @@ class HomePage:
             manager=self.ui_manager,
             object_id=ObjectID('#shop_button')
         )
+        self.ui_elements['shop_button'].visible = True
         
         # 创建卡包按钮（透明，仅用于边框效果）
         for i, pack in enumerate(self.pack_areas):
@@ -489,31 +473,43 @@ class HomePage:
                 object_id=ObjectID('#pack_button')
             )
             self.ui_elements['pack_buttons'].append(pack_button)
-    
+
+        print(f"[调试] shop_button.rect = {self.ui_elements['shop_button'].rect}")
+        print(f"[检查] shop_button enabled: {self.ui_elements['shop_button'].is_enabled}")
+        print(f"[检查] shop_button visible: {self.ui_elements['shop_button'].visible}")
+        print(f"[检查] UIManager window size: {self.ui_manager.window_resolution}")
+        print(f"[检查] shop_button absolute rect: {self.ui_elements['shop_button'].rect}")
+        print(f"[检查] mouse pos在UI区域内: {self.ui_elements['shop_button'].rect.collidepoint(pygame.mouse.get_pos())}")
+
+
     def handle_ui_event(self, event):
-        """处理pygame_gui事件 - 增强版"""
+        """处理pygame_gui事件"""
+        # print(f"[事件] 收到事件: {event}")
         result = None
         
         if event.type == pygame_gui.UI_BUTTON_PRESSED:
+            print(f"[UI事件] 按下了按钮: {event.ui_element}")
             if event.ui_element == self.ui_elements['magic_button']:
-                if self.show_emagica_window():
-                    if self.on_magic_click:
-                        self.on_magic_click()
-                    result = "magic"
+                print("[UI事件] 是 magic_button")
+                # self.show_emagica_window()
+                if self.on_magic_click:
+                    self.on_magic_click()
+                result = "magic"
             
             elif event.ui_element == self.ui_elements['shop_button']:
-                if self.show_tienda_window():
-                    if self.on_shop_click:
-                        self.on_shop_click()
-                    result = "shop"
+                print("[UI事件] 是 shop_button")
+                # self.show_tienda_window()
+                if self.on_shop_click:
+                    self.on_shop_click()
+                result = "shop"
             
             # 检查卡包按钮
             for i, pack_button in enumerate(self.ui_elements['pack_buttons']):
                 if event.ui_element == pack_button:
-                    if self.show_package_window(i, self.pack_areas[i]['type']):
-                        if self.on_pack_click:
-                            self.on_pack_click(i, self.pack_areas[i]['type'])
-                        result = f"pack_{i}"
+                    # self.show_package_window(i, self.pack_areas[i]['type'])
+                    if self.on_pack_click:
+                        self.on_pack_click(i, self.pack_areas[i]['type'])
+                    result = f"pack_{i}"
                     break
         
         # 处理窗口事件
@@ -526,37 +522,6 @@ class HomePage:
         return result
     
     def show_package_window(self, pack_index: int, pack_type: str):
-        """显示卡包窗口 - 增强版"""
-        if not WINDOWS_AVAILABLE:
-            self.show_message("卡包功能暂时不可用", "warning")
-            return False
-        
-        # # 通知窗口管理器
-        # if self.window_manager_callback:
-        #     result = self.window_manager_callback('open_package', {
-        #         'pack_index': pack_index,
-        #         'pack_type': pack_type
-        #     })
-        #     if result:
-        #         self.window_states['package']['is_open'] = True
-        #         self.window_states['package']['last_opened'] = pack_type
-        #         return True
-
-        # 通知窗口管理器
-        if self.window_manager_callback:
-            result = self.window_manager_callback('open_package', {
-                'pack_index': pack_index,
-                'pack_type': pack_type
-            })
-            if result is not False:  # <== 允许 None 继续 fallback
-                self.window_states['package']['is_open'] = True
-                self.window_states['package']['last_opened'] = pack_type
-                return True
-        
-        # 原有逻辑作为备用
-        return self._show_package_window_legacy(pack_index, pack_type)
-    
-    def _show_package_window_legacy(self, pack_index: int, pack_type: str):
         """显示卡包窗口"""
         if not WINDOWS_AVAILABLE:
             print("📦 [占位符] 显示卡包窗口")
@@ -568,7 +533,7 @@ class HomePage:
         
         # 创建新的卡包窗口
         try:
-            self.active_windows['package'] = ModernPackageWindow(
+            self.active_windows['package'] = PackageWindow(
                 self.screen_width, 
                 self.screen_height, 
                 self.ui_manager, 
@@ -581,22 +546,6 @@ class HomePage:
             print(f"❌ 创建卡包窗口失败: {e}")
     
     def show_emagica_window(self):
-        """显示魔法选择窗口 - 增强版"""
-        if not WINDOWS_AVAILABLE:
-            self.show_message("魔法选择功能暂时不可用", "warning")
-            return False
-        
-        # 通知窗口管理器
-        if self.window_manager_callback:
-            result = self.window_manager_callback('open_emagica', {})
-            if result:
-                self.window_states['e_magica']['is_open'] = True
-                return True
-        
-        # 原有逻辑作为备用
-        return self._show_emagica_window_legacy()
-
-    def _show_emagica_window_legacy(self):
         """显示魔法选择窗口"""
         if not WINDOWS_AVAILABLE:
             print("✨ [占位符] 显示魔法选择窗口")
@@ -617,112 +566,64 @@ class HomePage:
             print("✨ 显示魔法选择窗口")
         except Exception as e:
             print(f"❌ 创建魔法选择窗口失败: {e}")
+    
+    # def show_tienda_window(self):
+    #     """显示商店窗口"""
+    #     if not WINDOWS_AVAILABLE:
+    #         print("🛍️ [占位符] 显示商店窗口")
+    #         return
+        
+    #     # 关闭现有的商店窗口
+    #     if self.active_windows['tienda']:
+    #         self.active_windows['tienda'].close()
+        
+    #     # 创建新的商店窗口
+    #     try:
+    #         self.active_windows['tienda'] = TiendaWindow(
+    #             self.screen_width, 
+    #             self.screen_height, 
+    #             self.ui_manager
+    #         )
+    #         self.active_windows['tienda'].on_close = lambda: self.close_window('tienda')
+    #         print("🛍️ 显示商店窗口")
+    #     except Exception as e:
+    #         print(f"❌ 创建商店窗口失败: {e}")
 
+    # 新的现代化商店窗口方法
     def show_tienda_window(self):
-        """显示商店窗口 - 增强版"""
-        if not WINDOWS_AVAILABLE:
-            self.show_message("商店功能暂时不可用", "warning")
-            return False
-        
-        # 通知窗口管理器
-        if self.window_manager_callback:
-            result = self.window_manager_callback('open_tienda', {})
-            if result:
-                self.window_states['tienda']['is_open'] = True
-                return True
-        
-        # 原有逻辑作为备用
-        return self._show_tienda_window_legacy()
-
-    def _show_tienda_window_legacy(self):
-        """显示商店窗口"""
-        if not WINDOWS_AVAILABLE:
-            print("🛍️ [占位符] 显示商店窗口")
-            return
-        
+        """显示现代化商店窗口"""
         # 关闭现有的商店窗口
         if self.active_windows['tienda']:
             self.active_windows['tienda'].close()
         
-        # 创建新的商店窗口
+        # 创建新的现代化商店窗口
         try:
             self.active_windows['tienda'] = ModernTiendaWindow(
                 self.screen_width, 
                 self.screen_height, 
-                self.ui_manager
+                self.ui_manager,
+                self.db_manager  # 新增的参数
             )
+            self.active_windows['tienda'].is_visible = True
             self.active_windows['tienda'].on_close = lambda: self.close_window('tienda')
-            print("🛍️ 显示商店窗口")
+            print("🛍️ 显示现代化商店窗口")
         except Exception as e:
-            print(f"❌ 创建商店窗口失败: {e}")
+            print(f"❌ 创建现代化商店窗口失败: {e}")
     
     def close_window(self, window_name: str):
-        """关闭指定窗口 - 增强版"""
-        # 更新状态
-        if window_name in self.window_states:
-            self.window_states[window_name]['is_open'] = False
-        
-        # 通知窗口管理器
-        if self.window_manager_callback:
-            self.window_manager_callback('close_window', {'window_name': window_name})
-        
-        # 原有的关闭逻辑
+        """关闭指定窗口"""
         if window_name in self.active_windows:
             self.active_windows[window_name] = None
             print(f"🚪 关闭窗口: {window_name}")
     
     def close_all_windows(self):
-        """关闭所有弹出窗口 - 增强版"""
-        # 通知窗口管理器
-        if self.window_manager_callback:
-            self.window_manager_callback('close_all_windows', {})
-        
-        # 更新所有窗口状态
-        for window_name in self.window_states:
-            self.window_states[window_name]['is_open'] = False
-        
-        # 原有的关闭逻辑
+        """关闭所有弹出窗口"""
         for window_name, window in self.active_windows.items():
-            if window and hasattr(window, 'close'):
-                try:
-                    window.close()
-                except Exception as e:
-                    print(f"⚠️ 关闭窗口 {window_name} 时出错: {e}")
-        
+            if window and window.is_visible:
+                window.close()
         self.active_windows = {key: None for key in self.active_windows.keys()}
         print("🚪 关闭所有弹出窗口")
     
-    def get_window_states(self) -> dict:
-        """获取窗口状态"""
-        return self.window_states.copy()
-    
-    def is_any_window_open(self) -> bool:
-        """检查是否有窗口打开"""
-        return any(state['is_open'] for state in self.window_states.values())
-    
-    def get_last_opened_pack_type(self) -> str:
-        """获取最后打开的卡包类型"""
-        return self.window_states['package'].get('last_opened', 'basic')
-
-    def register_window_events(self, event_handlers: dict):
-        """注册窗口事件处理器"""
-        self.window_event_handlers = event_handlers
-        print("✅ 窗口事件处理器已注册")
-    
-    def get_sprite_click_count(self) -> int:
-        """获取精灵点击次数（用于统计）"""
-        return getattr(self, '_sprite_click_count', 0)
-    
-    def increment_sprite_click_count(self):
-        """增加精灵点击次数"""
-        if not hasattr(self, '_sprite_click_count'):
-            self._sprite_click_count = 0
-        self._sprite_click_count += 1
-        
-        # 每点击10次给予奖励提示
-        if self._sprite_click_count % 10 == 0:
-            self.show_message(f"已点击精灵 {self._sprite_click_count} 次！", "success")
-
     def update_sprite_animation(self):
         """更新精灵动画 - 包含淡出淡入效果"""
         if not self.sprite_frames:
@@ -911,7 +812,7 @@ class HomePage:
         
         # 平滑缩放动画
         if is_hover:
-            self.target_pack_scale[index] = 1.08
+            self.target_pack_scale[index] = 1.15
         else:
             self.target_pack_scale[index] = 1.0
         
@@ -1015,14 +916,13 @@ class HomePage:
         self.sprite_area['hover'] = self.sprite_area['rect'].collidepoint(pos)
     
     def handle_mouse_click(self, pos: tuple) -> Optional[str]:
-        """处理鼠标点击事件 - 增强版"""
+        """处理鼠标点击事件"""
         # 检查精灵区域点击
         if self.sprite_area['rect'].collidepoint(pos):
             # 只有在正常状态下才能触发新的动画
             if self.sprite_fade_state == "normal":
                 self.sprite_fade_state = "shaking"
                 self.sprite_shake_timer = 200  # 200ms抖动
-                self.increment_sprite_click_count()  # 增加点击计数
                 if self.on_sprite_click:
                     self.on_sprite_click()
             return "sprite"
@@ -1078,29 +978,16 @@ class HomePage:
             if window and window.is_visible:
                 try:
                     # 绘制窗口特定的自定义内容
-                    if hasattr(window, 'draw_custom_content'):
-                        window.draw_custom_content(screen)
-                    elif hasattr(window, 'draw_magical_effects'):
-                        window.draw_magical_effects(screen)
-                    elif hasattr(window, 'draw_shop_effects'):
-                        window.draw_shop_effects(screen)
+                    # if hasattr(window, 'draw_custom_content'):
+                    #     window.draw_custom_content(screen)
+                    # elif hasattr(window, 'draw_magical_effects'):
+                    #     window.draw_magical_effects(screen)
+                    # elif hasattr(window, 'draw_shop_effects'):
+                    #     window.draw_shop_effects(screen)
+                    window.draw(screen)
                 except Exception as e:
                     print(f"⚠️ 绘制窗口 {window_name} 自定义内容时出错: {e}")
     
-    def get_debug_info(self) -> dict:
-        """获取调试信息"""
-        return {
-            'screen_size': (self.screen_width, self.screen_height),
-            'scale_factor': self.scale_factor,
-            'window_states': self.window_states,
-            'sprite_click_count': getattr(self, '_sprite_click_count', 0),
-            'sprite_state': self.sprite_fade_state,
-            'pack_areas_count': len(self.pack_areas),
-            'sprite_frames_count': len(self.sprite_frames),
-            'has_window_manager': self.window_manager_callback is not None,
-            'has_external_messages': self.external_message_manager is not None
-        }
-
     def draw(self, screen: pygame.Surface, time_delta: float):
         """绘制主页"""
         # 更新UI管理器
@@ -1122,16 +1009,25 @@ class HomePage:
         for i, pack in enumerate(self.pack_areas):
             self.draw_pack_image_only(screen, pack, i)
         
+        # 绘制UI元素（透明按钮用于事件处理）
+        self.ui_manager.draw_ui(screen)
+
         # 绘制华丽的功能按钮（在UI按钮下方作为装饰层）
         self.draw_luxury_button(screen, self.magic_area, self.magic_hover_scale)
         self.draw_luxury_button(screen, self.shop_area, self.shop_hover_scale)
         
-        # 绘制UI元素（透明按钮用于事件处理）
-        self.ui_manager.draw_ui(screen)
-        
         # 绘制窗口自定义内容（在UI之上）
         self.draw_windows(screen)
-    
+
+        if self.ui_elements['shop_button']:
+            real_rect = self.ui_elements['shop_button'].rect.move(
+                self.ui_elements['shop_button'].relative_rect.topleft
+            )
+            # print(f"[验证] 鼠标位置: {pygame.mouse.get_pos()}")
+            # print(f"[验证] 按钮区域: {real_rect}")
+            # print(f"[验证] 命中按钮: {real_rect.collidepoint(pygame.mouse.get_pos())}")
+
+        
     def cleanup(self):
         """清理资源"""
         # 关闭所有弹出窗口
@@ -1154,6 +1050,10 @@ class HomePage:
                 except:
                     pass
         
+        # 添加数据库清理
+        if hasattr(self, 'db_manager'):
+            self.db_manager.close()
+        
         # 清理精灵帧
         for frame in self.sprite_frames:
             try:
@@ -1166,30 +1066,3 @@ class HomePage:
     def __del__(self):
         """析构函数"""
         self.cleanup()
-
-def create_enhanced_home_page(screen_width: int, screen_height: int, 
-                             nav_bar_height: int, window_manager_callback=None,
-                             message_manager=None) -> HomePage:
-    """
-    创建增强版主页的工厂函数
-    
-    Args:
-        screen_width: 屏幕宽度
-        screen_height: 屏幕高度
-        nav_bar_height: 导航栏高度
-        window_manager_callback: 窗口管理器回调
-        message_manager: 消息管理器
-        
-    Returns:
-        配置完成的HomePage实例
-    """
-    home_page = HomePage(screen_width, screen_height, nav_bar_height)
-    
-    if window_manager_callback:
-        home_page.set_window_manager_callback(window_manager_callback)
-    
-    if message_manager:
-        home_page.set_external_message_manager(message_manager)
-    
-    print("✅ 增强版主页创建完成")
-    return home_page

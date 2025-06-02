@@ -46,12 +46,12 @@ def build_graphviz_tree(dot, path, parent, excluded):
             build_graphviz_tree(dot, full_path, node_id, excluded)
 
 def main():
-    current_dir = os.path.abspath(".")
+    current_dir = os.path.dirname(os.path.abspath(__file__))
     if os.path.basename(current_dir) != "development":
-        print("❌ 当前脚本必须从 development/ 文件夹中运行！")
-        print("❌ This script must be run from inside the 'development/' folder!")
-        print("❌ ¡Este script debe ejecutarse desde la carpeta 'development/'!")
-        print("❌ このスクリプトは 'development/' フォルダ内で実行する必要があります！")
+        print(f"❌ 当前脚本必须从 development/ 文件夹中运行！当前文件夹为：{current_dir}")
+        print(f"❌ This script must be run from inside the 'development/' folder! Current folder: {current_dir}")
+        print(f"❌ Este script debe ejecutarse desde la carpeta 'development/'! Carpeta actual: {current_dir}")
+        print(f"❌ このスクリプトは 'development/' フォルダ内で実行する必要があります！現在のフォルダ: {current_dir}")
         print("请切换到 development/ 目录后再运行此脚本。")
         print("Please switch to the 'development/' directory and run this script again.")
         print("Por favor, cambie al directorio 'development/' y ejecute este script de nuevo.")
