@@ -172,6 +172,9 @@ class Card:
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> 'Card':
         """从字典创建实例（用于数据库读取）"""
+        # ✅ 处理image字段映射（JSON中是"image"，数据库中是"image_path"）
+        image_path = data.get('image_path', '') or data.get('image', '')
+        
         # 解析类型
         types = []
         if isinstance(data.get('types'), str):
@@ -201,7 +204,7 @@ class Card:
             types=types,
             rarity=data.get('rarity', 'Common'),
             attacks=attacks,
-            image_path=data.get('image_path', ''),
+            image_path=image_path,  # ✅ 使用处理后的image_path
             set_name=data.get('set_name', ''),
             card_number=data.get('card_number', ''),
             description=data.get('description', '')

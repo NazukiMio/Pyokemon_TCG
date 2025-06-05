@@ -5,12 +5,14 @@ import os
 
 # 导入组件
 from game.scenes.home_page import HomePage
+from game.scenes.dex_page import DexPage
 from game.ui.navigation_bar import PokemonNavigationGUI
 from game.core.message_manager import MessageManager
 # from game.ui.toast_message import ToastMessage
 from game.core.auth.auth_manager import get_auth_manager
 # 导入新的数据库管理器
 from game.core.database.database_manager import DatabaseManager
+from game.core.game_manager import GameManager
 
 auth = get_auth_manager()
 print("测试当前用户 ID：", auth.get_current_user_id())
@@ -48,6 +50,9 @@ class MainScene:
         self.ui_manager = pygame_gui.UIManager((self.screen_width, self.screen_height))
         self.ui_manager.set_window_resolution((self.screen_width, self.screen_height))
 
+        # 游戏管理器
+        self.game_manager = GameManager()
+
         # 通用背景色 - 浅蓝灰色渐变
         self.background_colors = {
             'top': (240, 245, 251),     # 浅蓝白色
@@ -63,13 +68,22 @@ class MainScene:
             self.screen_width, 
             self.screen_height, 
             self.ui_manager,  # 传入UI管理器
+            self.game_manager, # 游戏管理器
             self.nav_bar.height  # 使用导航栏的高度
         )
 
+        self.dex_page = None
+
         # 确保数据库管理器已初始化（可选，因为HomePage会处理）
         # 如果需要在MainScene层面访问数据库，可以添加：
-        # self.db_manager = DatabaseManager()
+        self.db_manager = DatabaseManager()
         # self.db_manager.initialize_database()
+
+    #     from game.core.cards.collection_manager import CardManager
+    #     self.card_manager = CardManager(
+    #         self.db_manager.connection,
+    #         cards_json_path=os.path.join("data", "card.json")
+    # )
         
         # 当前页面
         self.current_page = 'home'
@@ -79,10 +93,126 @@ class MainScene:
         
         # 设置回调
         self.setup_callbacks()
+
+        # 缓存渐变背景
+        self.gradient_background = None
         
         print("✅ 主场景初始化完成")
         print(f"[调试] UIManager id in MainScene: {id(self.ui_manager)}")
+
+        # 初始化数据库
+        self.db_manager = DatabaseManager()
+
+        # 带验证的卡牌管理器初始化
+        self._initialize_card_manager_with_validation()
+        
+    #     # 简单的卡牌数据初始化
+    #     self._initialize_card_database()
     
+    # def _initialize_card_database(self):
+    #     """初始化卡牌数据库（仅在为空时导入）"""
+    #     try:
+    #         # 检查数据库是否为空
+    #         existing_cards = self.db_manager.card_dao.search_cards(limit=1)
+            
+    #         if existing_cards:
+    #             print(f"✅ 数据库已有卡牌数据，跳过初始化")
+    #             return
+            
+    #         # 数据库为空，开始导入
+    #         import json
+    #         import os
+            
+    #         card_file = os.path.join("card_assets", "cards.json")
+    #         if os.path.exists(card_file):
+    #             with open(card_file, 'r', encoding='utf-8') as f:
+    #                 cards_data = json.load(f)
+                
+    #             print(f"📥 数据库为空，正在导入 {len(cards_data)} 张卡牌...")
+                
+    #             for card_data in cards_data:
+    #                 self.db_manager.card_dao.create_card(card_data)
+                
+    #             print(f"✅ 成功导入 {len(cards_data)} 张卡牌到数据库")
+    #         else:
+    #             print(f"❌ 找不到卡牌数据文件: {card_file}")
+                
+    #     except Exception as e:
+    #         print(f"❌ 初始化卡牌数据库失败: {e}")
+
+    def _initialize_card_manager_with_validation(self):
+        """带验证的卡牌管理器初始化"""
+        print("🔍 开始初始化卡牌管理器...")
+        
+        try:
+            # 1. 验证数据库连接
+            if not self.db_manager or not self.db_manager.connection:
+                print("❌ 数据库连接失败")
+                return False
+            print("✅ 数据库连接正常")
+            
+            # 2. 验证card.json文件
+            card_json_path = os.path.join("card_assets", "cards.json")
+            if not os.path.exists(card_json_path):
+                print(f"❌ 找不到卡牌数据文件: {card_json_path}")
+                return False
+            print(f"✅ 找到卡牌数据文件: {card_json_path}")
+            
+            # 3. 检查文件大小
+            file_size = os.path.getsize(card_json_path)
+            print(f"📄 卡牌文件大小: {file_size / 1024:.1f} KB")
+            
+            if file_size < 1000:  # 小于1KB可能有问题
+                print("⚠️ 警告：卡牌文件很小，可能数据不完整")
+            
+            # 4. 初始化CardManager
+            print("🔄 正在初始化CardManager...")
+            from game.core.cards.collection_manager import CardManager
+            
+            self.card_manager = CardManager(
+                self.db_manager.connection,
+                cards_json_path=card_json_path
+            )
+            print("✅ CardManager初始化完成")
+            
+            # 5. 验证数据导入结果
+            card_count = self.card_manager.card_dao.get_card_count()
+            print(f"📊 数据库中卡牌数量: {card_count}")
+            
+            if card_count == 0:
+                print("⚠️ 警告：数据库中没有卡牌数据")
+                return False
+            
+            # 6. 验证卡牌数据完整性
+            rarities = self.card_manager.card_dao.get_all_rarities()
+            types = self.card_manager.card_dao.get_all_types()
+            
+            print(f"🎯 可用稀有度: {len(rarities)} 种")
+            print(f"🏷️ 可用类型: {len(types)} 种")
+            
+            if len(rarities) < 3:
+                print("⚠️ 警告：稀有度种类过少")
+            
+            if len(types) < 5:
+                print("⚠️ 警告：卡牌类型种类过少")
+            
+            # 7. 测试随机获取卡牌
+            test_card = self.card_manager.card_dao.get_random_cards(1)
+            if test_card:
+                print(f"🎲 测试卡牌: {test_card[0].name} ({test_card[0].rarity})")
+            else:
+                print("❌ 无法获取测试卡牌")
+                return False
+            
+            print("🎉 卡牌管理器初始化验证完成！")
+            return True
+            
+        except Exception as e:
+            print(f"❌ 卡牌管理器初始化失败: {e}")
+            import traceback
+            print(f"详细错误: {traceback.format_exc()}")
+            return False
+
     def setup_callbacks(self):
         """设置回调函数"""
         
@@ -125,6 +255,19 @@ class MainScene:
                 # 切换到设置菜单场景
                 if self.callback:
                     self.callback("settings")
+
+            elif nav_id == 'pokedex':
+                # 切换到图鉴页面
+                self.current_page = nav_id
+                if not self.dex_page:
+                    self.dex_page = DexPage(
+                        self.screen_width, 
+                        self.screen_height, 
+                        self.ui_manager, 
+                        self.card_manager,
+                        self.nav_bar.height
+                    )
+
             elif nav_id == 'battle':
                 # 切换到战斗场景
                 if self.callback:
@@ -156,17 +299,20 @@ class MainScene:
     
     def create_gradient_background(self):
         """创建渐变背景"""
-        gradient_surface = pygame.Surface((self.screen_width, self.screen_height))
-        
-        for y in range(self.screen_height):
-            ratio = y / self.screen_height
-            r = int(self.background_colors['top'][0] * (1 - ratio) + self.background_colors['bottom'][0] * ratio)
-            g = int(self.background_colors['top'][1] * (1 - ratio) + self.background_colors['bottom'][1] * ratio)
-            b = int(self.background_colors['top'][2] * (1 - ratio) + self.background_colors['bottom'][2] * ratio)
+        if self.gradient_background is None:
+            gradient_surface = pygame.Surface((self.screen_width, self.screen_height))
             
-            pygame.draw.line(gradient_surface, (r, g, b), (0, y), (self.screen_width, y))
+            for y in range(self.screen_height):
+                ratio = y / self.screen_height
+                r = int(self.background_colors['top'][0] * (1 - ratio) + self.background_colors['bottom'][0] * ratio)
+                g = int(self.background_colors['top'][1] * (1 - ratio) + self.background_colors['bottom'][1] * ratio)
+                b = int(self.background_colors['top'][2] * (1 - ratio) + self.background_colors['bottom'][2] * ratio)
+                
+                pygame.draw.line(gradient_surface, (r, g, b), (0, y), (self.screen_width, y))
+            
+            self.gradient_background = gradient_surface
         
-        return gradient_surface
+        return self.gradient_background
     
     def draw_page_placeholder(self, page_name: str):
         """绘制其他页面的占位内容"""
@@ -286,20 +432,38 @@ class MainScene:
             self.nav_bar.resize(self.screen_width, self.screen_height)
             self.home_page.resize(self.screen_width, self.screen_height)
             self.ui_manager.set_window_resolution(event.size)
+
+            # 调整DexPage大小
+            if self.dex_page:
+                self.dex_page.resize(self.screen_width, self.screen_height)
             
             # 更新缩放因子
             self.scale_factor = min(self.screen_width / 1920, self.screen_height / 1080)
+
+            # 清空渐变背景缓存（因为尺寸变了）
+            self.gradient_background = None
             
             print(f"📐 窗口调整: {self.screen_width}x{self.screen_height}")
         
         # 导航栏事件处理
         nav_result = self.nav_bar.handle_event(event)
         
+        # 初始化UI结果
+        ui_result = None
+
         # 主页事件处理（仅在主页时）
         if self.current_page == 'home':
             # pygame_gui事件处理（包括窗口事件）
             ui_result = self.home_page.handle_ui_event(event)
             
+            # 处理导航栏事件
+        elif self.current_page == 'pokedex':  # 添加这里
+            if self.dex_page:
+                result = self.dex_page.handle_event(event)
+                if result == "back_to_home":
+                    self.nav_bar.set_active('home')
+                    self.current_page = 'home'
+
             # 记录窗口操作
             if ui_result:
                 if ui_result.startswith("package_"):
@@ -335,7 +499,11 @@ class MainScene:
         if self.current_page == 'home':
             # 主页有自己的更新逻辑，但我们需要确保兼容性
             pass
-        
+        # 更新图鉴页面（如果存在）
+        elif self.current_page == 'pokedex':
+            if self.dex_page:
+                self.dex_page.update(dt)
+
         # 更新消息管理器
         self.message_manager.update(dt)
         
@@ -347,8 +515,15 @@ class MainScene:
     
     def draw(self):
         """绘制场景"""
-        # 计算时间增量（用于动画）
-        time_delta = pygame.time.get_ticks() / 1000.0
+        # 获取实际的时间增量
+        current_time = pygame.time.get_ticks() / 1000.0
+        if not hasattr(self, 'last_time'):
+            self.last_time = current_time
+        time_delta = current_time - self.last_time
+        self.last_time = current_time
+        
+        # 限制最大时间增量，避免卡顿时动画跳跃
+        time_delta = min(time_delta, 0.05) 
         
         # 绘制统一的渐变背景
         gradient_bg = self.create_gradient_background()
@@ -358,10 +533,13 @@ class MainScene:
         if self.current_page == 'home':
             # 绘制主页内容（传入time_delta）
             self.home_page.draw(self.screen, time_delta)
+        elif self.current_page == 'pokedex':
+            # 绘制图鉴页面
+            if self.dex_page:
+                self.dex_page.draw(self.screen)
         else:
             # 绘制其他页面的占位内容
             page_names = {
-                'pokedex': 'Pokédex',
                 'social': 'Social',
                 'battle': 'Batalla', 
                 'menu': 'Menú'
@@ -393,6 +571,9 @@ class MainScene:
         
         if hasattr(self.home_page, 'cleanup'):
             self.home_page.cleanup()
+
+        if hasattr(self.dex_page, 'cleanup'):
+            self.dex_page.cleanup()
         
         if hasattr(self.nav_bar, 'cleanup'):
             self.nav_bar.cleanup()

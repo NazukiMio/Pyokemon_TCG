@@ -69,18 +69,10 @@ class RegisterScene:
         print("✅ 注册场景初始化完成")
 
     def setup_pygame_gui(self):
-        """复用login主题"""
-        # 直接复制login主题文件
-        try:
-            if os.path.exists('login_theme.json'):
-                shutil.copy2('login_theme.json', 'register_theme.json')
-                print("✅ 复用login主题文件")
-            else:
-                print("⚠️ login主题文件不存在，创建基础主题")
-                self.create_basic_theme()
-        except Exception as e:
-            print(f"⚠️ 主题文件复制失败: {e}")
-            self.create_basic_theme()
+        """设置pygame_gui主题"""
+        # 总是创建完整的主题，确保样式正确应用
+        self.create_basic_theme()
+        print("✅ 创建完整注册主题")
         
         # 创建UI管理器
         self.ui_manager = pygame_gui.UIManager(
@@ -89,30 +81,111 @@ class RegisterScene:
         )
     
     def create_basic_theme(self):
-        """创建基础主题（后备方案）"""
+        """创建完整主题"""
         import json
         theme_data = {
             "#main_button": {
                 "colours": {
                     "normal_bg": "#5865F2",
                     "hovered_bg": "#4338D8",
+                    "selected_bg": "#4338D8",
+                    "active_bg": "#4338D8",
+                    "normal_border": "#7C84FF",
+                    "hovered_border": "#3730A3",
+                    "selected_border": "#3730A3",
+                    "active_border": "#3730A3",
                     "normal_text": "#FFFFFF",
-                    "hovered_text": "#FFFFFF"
+                    "hovered_text": "#FFFFFF",
+                    "selected_text": "#FFFFFF",
+                    "active_text": "#FFFFFF"
+                },
+                "font": {
+                    "name": "arial",
+                    "size": "20",
+                    "bold": "0"
+                },
+                "font:hovered": {
+                    "name": "arial",
+                    "size": "20",
+                    "bold": "1"
                 },
                 "misc": {
                     "shape": "rounded_rectangle",
-                    "shape_corner_radius": "16"
+                    "shape_corner_radius": "16",
+                    "border_width": "3",
+                    "shadow_width": "0"
+                }
+            },
+            "#text_button": {
+                "colours": {
+                    "normal_bg": "#00000000",
+                    "hovered_bg": "#F8F9FF",
+                    "selected_bg": "#F8F9FF",
+                    "active_bg": "#F8F9FF",
+                    "normal_border": "#00000000",
+                    "hovered_border": "#5865F2",
+                    "selected_border": "#5865F2",
+                    "active_border": "#5865F2",
+                    "normal_text": "#5865F2",
+                    "hovered_text": "#3730A3",
+                    "selected_text": "#3730A3",
+                    "active_text": "#3730A3"
+                },
+                "font": {
+                    "name": "arial",
+                    "size": "16",
+                    "bold": "0"
+                },
+                "font:hovered": {
+                    "name": "arial",
+                    "size": "16",
+                    "bold": "1"
+                },
+                "misc": {
+                    "shape": "rounded_rectangle",
+                    "shape_corner_radius": "8",
+                    "border_width": "0",
+                    "shadow_width": "0"
+                },
+                "misc:hovered": {
+                    "shape": "rounded_rectangle",
+                    "shape_corner_radius": "8",
+                    "border_width": "2",
+                    "shadow_width": "0"
                 }
             },
             "text_entry_line": {
                 "colours": {
                     "normal_bg": "#FFFFFF",
+                    "focused_bg": "#FFFFFF",
                     "normal_text": "#FFFFFF",
+                    "selected_text": "#000000",
+                    "selected_bg": "#5865F2",
+                    "normal_border": "#E5E7EB",
                     "focused_border": "#5865F2"
                 },
                 "misc": {
                     "shape": "rounded_rectangle",
-                    "shape_corner_radius": "12"
+                    "shape_corner_radius": "12",
+                    "border_width": "2",
+                    "shadow_width": "0",
+                    "padding": "12,8"
+                },
+                "font": {
+                    "name": "arial",
+                    "size": "16",
+                    "bold": "0"
+                }
+            },
+            "label": {
+                "colours": {
+                    "normal_text": "#374151",
+                    "normal_bg": "#00000000"
+                },
+                "font": {
+                    "name": "arial",
+                    "size": "14",
+                    "bold": "0"
                 }
             }
         }

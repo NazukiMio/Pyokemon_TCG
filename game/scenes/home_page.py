@@ -19,9 +19,10 @@ except ImportError:
 
 # 导入窗口类
 try:
-    from game.scenes.windows.package import PackageWindow
+    # from game.scenes.windows.package import PackageWindow
     from game.scenes.windows.e_magica import EMagicaWindow
     from game.scenes.windows.tienda.tienda_modern import ModernTiendaWindow
+    from game.scenes.windows.package.pack_opening_window import PackOpeningWindow
 
     WINDOWS_AVAILABLE = True
     print("✅ 窗口模块导入成功")
@@ -37,7 +38,7 @@ class HomePage:
     横屏布局版本 - 使用pygame_gui重构 + 弹出窗口支持
     """
     
-    def __init__(self, screen_width: int, screen_height: int, ui_manager, nav_bar_height: int = 100):
+    def __init__(self, screen_width: int, screen_height: int, ui_manager, game_manager, nav_bar_height: int = 100):
         """
         初始化主页
         
@@ -46,6 +47,8 @@ class HomePage:
             screen_height: 屏幕高度
             nav_bar_height: 导航栏高度
         """
+        self.game_manager = game_manager
+
         self.screen_width = screen_width
         self.screen_height = screen_height
         self.nav_bar_height = nav_bar_height
@@ -100,6 +103,14 @@ class HomePage:
         # 加载现代主题
         self.setup_ui_theme()
         
+        # Logo相关
+        self.logo = None
+        # self.subtitle_logo = None
+
+        # 图标相关
+        self.shop_icon = None
+        self.magic_icon = None
+
         # UI元素
         self.ui_elements = {
             'magic_button': None,
@@ -109,7 +120,7 @@ class HomePage:
         
         # 弹出窗口管理
         self.active_windows = {
-            'package': None,
+            'pack_opening': None,
             'e_magica': None,
             'tienda': None
         }
@@ -165,10 +176,16 @@ class HomePage:
         # 创建布局
         self.create_layout()
 
-        print(f"[注册检查] 所有 UI 元素: {[str(s) for s in self.ui_manager.get_sprite_group().sprites()]}")
-        print(f"[注册检查] shop_button 是否存在: {self.ui_elements['shop_button'] in self.ui_manager.get_sprite_group().sprites()}")
-        print(f"[按钮位置] shop_button.rect = {self.ui_elements['shop_button'].relative_rect}")
-        print(f"[调试] UIManager id in HomePage: {id(self.ui_manager)}")
+        # 加载Logo和副标题Logo
+        self.load_logo()
+        # self.load_subtitle_logo()
+
+        self.load_icons()
+
+        # print(f"[注册检查] 所有 UI 元素: {[str(s) for s in self.ui_manager.get_sprite_group().sprites()]}")
+        # print(f"[注册检查] shop_button 是否存在: {self.ui_elements['shop_button'] in self.ui_manager.get_sprite_group().sprites()}")
+        # print(f"[按钮位置] shop_button.rect = {self.ui_elements['shop_button'].relative_rect}")
+        # print(f"[调试] UIManager id in HomePage: {id(self.ui_manager)}")
 
 
     
@@ -208,56 +225,121 @@ class HomePage:
         
         return fonts
     
+    def load_icons(self):
+        """加载功能图标"""
+        try:
+            # 加载商店图标
+            shop_icon_path = os.path.join("assets", "icons", "store.png")
+            if os.path.exists(shop_icon_path):
+                self.shop_icon = pygame.image.load(shop_icon_path)
+                # 调整图标大小 - 适应垂直布局，占据按钮上部分空间
+                icon_size = int(120 * self.scale_factor)  # 增大图标
+                self.shop_icon = pygame.transform.smoothscale(self.shop_icon, (icon_size, icon_size))
+                print("✅ 商店图标加载成功")
+            else:
+                self.shop_icon = None
+                
+            # 加载魔法图标  
+            magic_icon_path = os.path.join("assets", "icons", "magic.png")
+            if os.path.exists(magic_icon_path):
+                self.magic_icon = pygame.image.load(magic_icon_path)
+                # 调整图标大小 - 适应垂直布局，占据按钮上部分空间
+                icon_size = int(120 * self.scale_factor)  # 增大图标
+                self.magic_icon = pygame.transform.smoothscale(self.magic_icon, (icon_size, icon_size))
+                print("✅ 魔法图标加载成功")
+            else:
+                self.magic_icon = None
+                
+        except Exception as e:
+            print(f"⚠️ 图标加载失败: {e}")
+            self.shop_icon = None
+            self.magic_icon = None
+
     def setup_ui_theme(self):
         """设置现代UI主题"""
         theme_data = {
             '#magic_button': {
                 'colours': {
-                    'normal_bg': '#00000000',  # 完全透明，让自定义绘制生效
+                    'normal_bg': '#00000000',
                     'hovered_bg': '#00000000',
                     'selected_bg': '#00000000',
+                    'pressed_bg': '#00000000',
+                    'active_bg': '#00000000',
+                    'disabled_bg': '#00000000',
                     'normal_border': '#00000000',
                     'hovered_border': '#00000000',
                     'selected_border': '#00000000',
-                    'normal_text': '#00000000',  # 透明文字
-                    'hovered_text': '#00000000'
+                    'pressed_border': '#00000000',
+                    'active_border': '#00000000',
+                    'disabled_border': '#00000000',
+                    'normal_text': '#00000000',
+                    'hovered_text': '#00000000',
+                    'selected_text': '#00000000',
+                    'pressed_text': '#00000000',
+                    'active_text': '#00000000',
+                    'disabled_text': '#00000000'
                 },
                 'misc': {
                     'border_width': '0',
-                    'border_radius': '20',
-                    'shadow_width': '0'
+                    'border_radius': '0',
+                    'shadow_width': '0',
+                    'shape': 'rectangle',
+                    'tool_tip_delay': '1.0',
+                    'text_shadow': '0',
+                    'text_shadow_colour': '#00000000'
                 }
             },
             '#shop_button': {
                 'colours': {
-                    'normal_bg': '#00000000',  # 完全透明，让自定义绘制生效
+                    'normal_bg': '#00000000',
                     'hovered_bg': '#00000000',
                     'selected_bg': '#00000000',
+                    'pressed_bg': '#00000000',
+                    'active_bg': '#00000000',
+                    'disabled_bg': '#00000000',
                     'normal_border': '#00000000',
                     'hovered_border': '#00000000',
                     'selected_border': '#00000000',
-                    'normal_text': '#00000000',  # 透明文字
-                    'hovered_text': '#00000000'
+                    'pressed_border': '#00000000',
+                    'active_border': '#00000000',
+                    'disabled_border': '#00000000',
+                    'normal_text': '#00000000',
+                    'hovered_text': '#00000000',
+                    'selected_text': '#00000000',
+                    'pressed_text': '#00000000',
+                    'active_text': '#00000000',
+                    'disabled_text': '#00000000'
                 },
                 'misc': {
                     'border_width': '0',
-                    'border_radius': '20',
-                    'shadow_width': '0'
+                    'border_radius': '0',
+                    'shadow_width': '0',
+                    'shape': 'rectangle',
+                    'tool_tip_delay': '1.0',
+                    'text_shadow': '0',
+                    'text_shadow_colour': '#00000000'
                 }
             },
             '#pack_button': {
                 'colours': {
-                    'normal_bg': '#00000000',  # 透明背景
+                    'normal_bg': '#00000000',
                     'hovered_bg': '#00000000',
                     'selected_bg': '#00000000',
+                    'pressed_bg': '#00000000',
+                    'active_bg': '#00000000',
+                    'disabled_bg': '#00000000',
                     'normal_border': '#00000000',
-                    'hovered_border': '#5865F240',
-                    'selected_border': '#5865F2'
+                    'hovered_border': '#00000000',
+                    'selected_border': '#00000000',
+                    'pressed_border': '#00000000',
+                    'active_border': '#00000000',
+                    'disabled_border': '#00000000'
                 },
                 'misc': {
-                    'border_width': '3',
-                    'border_radius': '15',
-                    'shadow_width': '10'
+                    'border_width': '0',
+                    'border_radius': '0',
+                    'shadow_width': '0',
+                    'shape': 'rectangle'
                 }
             }
         }
@@ -360,14 +442,15 @@ class HomePage:
         
         # 左侧卡包区域 - 使用弹性布局
         pack_area_width = int(self.screen_width * 0.65)
-        pack_width = scaled(180)  # 再次放大卡包
-        pack_height = scaled(300)  # 再次放大卡包
+        pack_width = scaled(216)  # 再次放大卡包
+        pack_height = scaled(360)  # 再次放大卡包
         
         # 减小卡包间距到30像素（比例化）
-        pack_spacing = scaled(30)
+        pack_spacing = scaled(45)
         total_pack_width = pack_width * 3 + pack_spacing * 2
+        pack_margin_y = scaled(5)  
         pack_start_x = (pack_area_width - total_pack_width) // 2
-        pack_y = (self.content_height - pack_height) // 2
+        pack_y = (self.content_height - pack_height) // 2 - pack_margin_y
         
         self.pack_areas = []
         pack_names = ["FESTIVAL BRILLANTE", "GUARDIANES CELESTIALES", "GUARDIANES CELESTIALES"]
@@ -388,9 +471,9 @@ class HomePage:
         right_area_width = self.screen_width - right_area_x - margin
         
         # 功能按钮 - 更高更华丽
-        function_width = int(right_area_width * 0.45)
-        function_height = scaled(120)  # 增加高度
-        function_y = scaled(60)
+        function_width = int(right_area_width * 0.4)
+        function_height = scaled(200)  # 增加高度
+        function_y = scaled(80)
         function_spacing = (right_area_width - function_width * 2) // 3
         
         # 魔法选择区域
@@ -398,7 +481,7 @@ class HomePage:
         self.magic_area = {
             'rect': pygame.Rect(magic_x, function_y, function_width, function_height),
             'title': 'Elecciones mágicas',
-            'icon': '✨',
+            'icon': 'magic', # 使用图标名称
             'hover': False
         }
         
@@ -407,14 +490,14 @@ class HomePage:
         self.shop_area = {
             'rect': pygame.Rect(shop_x, function_y, function_width, function_height),
             'title': 'Tienda',
-            'icon': '🛍️',
+            'icon': 'shop', # 使用图标名称
             'hover': False
         }
         
         # 精灵区域 - 加大一倍，向左移动
         sprite_size = scaled(280)  # 放大一倍
-        sprite_margin_x = scaled(50)  # 向左移动一些
-        sprite_margin_y = scaled(30)
+        sprite_margin_x = scaled(100)  # 向左移动一些
+        sprite_margin_y = scaled(90)
         sprite_x = self.screen_width - sprite_size - sprite_margin_x
         sprite_y = self.content_height - sprite_size - sprite_margin_y
         
@@ -426,6 +509,34 @@ class HomePage:
         # 创建pygame_gui元素
         self.create_ui_elements()
     
+    def load_logo(self):
+        """加载Logo"""
+        try:
+            logo_path = os.path.join("assets", "images", "logo", "game_logo.png")
+            if os.path.exists(logo_path):
+                self.logo = pygame.image.load(logo_path)
+                # 调整Logo大小 - 左上角小logo
+                logo_width = int(self.screen_width * 0.16)  # 改为8%宽度
+                logo_height = int(logo_width * (self.logo.get_height() / self.logo.get_width()))
+                self.logo = pygame.transform.smoothscale(self.logo, (logo_width, logo_height))
+                print("✅ Logo加载成功")
+        except Exception as e:
+            print(f"⚠️ Logo加载失败: {e}")
+
+    # def load_subtitle_logo(self):
+    #     """加载副标题Logo"""
+    #     try:
+    #         logo_path = os.path.join("assets", "images", "logo", "secondLogo.png")
+    #         if os.path.exists(logo_path):
+    #             self.subtitle_logo = pygame.image.load(logo_path)
+    #             # 调整副标题Logo大小 - 左上角小logo
+    #             logo_width = int(self.screen_width * 0.10)  # 改为12%宽度
+    #             logo_height = int(logo_width * (self.subtitle_logo.get_height() / self.subtitle_logo.get_width()))
+    #             self.subtitle_logo = pygame.transform.smoothscale(self.subtitle_logo, (logo_width, logo_height))
+    #             print("✅ 副标题Logo加载成功")
+    #     except Exception as e:
+    #         print(f"⚠️ 副标题Logo加载失败: {e}")
+
     def create_ui_elements(self):
         """创建pygame_gui UI元素"""
         # 清理旧元素
@@ -461,7 +572,7 @@ class HomePage:
             manager=self.ui_manager,
             object_id=ObjectID('#shop_button')
         )
-        self.ui_elements['shop_button'].visible = True
+        # self.ui_elements['shop_button'].visible = True
         
         # 创建卡包按钮（透明，仅用于边框效果）
         for i, pack in enumerate(self.pack_areas):
@@ -487,6 +598,20 @@ class HomePage:
         # print(f"[事件] 收到事件: {event}")
         result = None
         
+        # 优先处理开包界面事件
+        if self.active_windows['pack_opening'] and self.active_windows['pack_opening'].is_visible:
+            pack_result = self.active_windows['pack_opening'].handle_event(event)
+            if pack_result:
+                return f"pack_opening_{pack_result}"
+
+        # 处理窗口事件
+        for window_name, window in self.active_windows.items():
+            if window and window.is_visible:
+                window_result = window.handle_event(event)
+                if window_result:
+                    result = f"{window_name}_{window_result}"
+
+        # 处理UI事件
         if event.type == pygame_gui.UI_BUTTON_PRESSED:
             print(f"[UI事件] 按下了按钮: {event.ui_element}")
             if event.ui_element == self.ui_elements['magic_button']:
@@ -506,44 +631,59 @@ class HomePage:
             # 检查卡包按钮
             for i, pack_button in enumerate(self.ui_elements['pack_buttons']):
                 if event.ui_element == pack_button:
-                    # self.show_package_window(i, self.pack_areas[i]['type'])
+                    self.show_package_window(i, self.pack_areas[i]['type'])
                     if self.on_pack_click:
                         self.on_pack_click(i, self.pack_areas[i]['type'])
                     result = f"pack_{i}"
                     break
         
-        # 处理窗口事件
-        for window_name, window in self.active_windows.items():
-            if window and window.is_visible:
-                window_result = window.handle_event(event)
-                if window_result:
-                    result = f"{window_name}_{window_result}"
-        
         return result
     
+    # def show_package_window(self, pack_index: int, pack_type: str):
+    #     """显示卡包窗口"""
+    #     if not WINDOWS_AVAILABLE:
+    #         print("📦 [占位符] 显示卡包窗口")
+    #         return
+        
+    #     # 关闭现有的卡包窗口
+    #     if self.active_windows['package']:
+    #         self.active_windows['package'].close()
+        
+    #     # 创建新的卡包窗口
+    #     try:
+    #         self.active_windows['package'] = PackageWindow(
+    #             self.screen_width, 
+    #             self.screen_height, 
+    #             self.ui_manager, 
+    #             pack_index, 
+    #             pack_type
+    #         )
+    #         self.active_windows['package'].on_close = lambda: self.close_window('package')
+    #         print(f"📦 显示卡包窗口: 索引{pack_index}, 类型{pack_type}")
+    #     except Exception as e:
+    #         print(f"❌ 创建卡包窗口失败: {e}")
+
     def show_package_window(self, pack_index: int, pack_type: str):
-        """显示卡包窗口"""
+        """显示开包界面"""
         if not WINDOWS_AVAILABLE:
-            print("📦 [占位符] 显示卡包窗口")
+            print("📦 [占位符] 显示开包界面")
             return
         
-        # 关闭现有的卡包窗口
-        if self.active_windows['package']:
-            self.active_windows['package'].close()
+        # 关闭现有的开包窗口
+        if self.active_windows['pack_opening']:
+            self.active_windows['pack_opening'].close()
         
-        # 创建新的卡包窗口
+        # 创建新的开包窗口
         try:
-            self.active_windows['package'] = PackageWindow(
+            self.active_windows['pack_opening'] = PackOpeningWindow(
                 self.screen_width, 
                 self.screen_height, 
-                self.ui_manager, 
-                pack_index, 
-                pack_type
+                self.game_manager  # 传入game_manager而不是其他参数
             )
-            self.active_windows['package'].on_close = lambda: self.close_window('package')
-            print(f"📦 显示卡包窗口: 索引{pack_index}, 类型{pack_type}")
+            self.active_windows['pack_opening'].show()
+            print(f"📦 显示开包界面: 索引{pack_index}, 类型{pack_type}")
         except Exception as e:
-            print(f"❌ 创建卡包窗口失败: {e}")
+            print(f"❌ 创建开包界面失败: {e}")
     
     def show_emagica_window(self):
         """显示魔法选择窗口"""
@@ -610,12 +750,20 @@ class HomePage:
         except Exception as e:
             print(f"❌ 创建现代化商店窗口失败: {e}")
     
+    # def close_window(self, window_name: str):
+    #     """关闭指定窗口"""
+    #     if window_name in self.active_windows:
+    #         self.active_windows[window_name] = None
+    #         print(f"🚪 关闭窗口: {window_name}")
+    
     def close_window(self, window_name: str):
         """关闭指定窗口"""
-        if window_name in self.active_windows:
+        if window_name in self.active_windows and self.active_windows[window_name]:
+            if hasattr(self.active_windows[window_name], 'close'):
+                self.active_windows[window_name].close()
             self.active_windows[window_name] = None
             print(f"🚪 关闭窗口: {window_name}")
-    
+
     def close_all_windows(self):
         """关闭所有弹出窗口"""
         for window_name, window in self.active_windows.items():
@@ -793,15 +941,33 @@ class HomePage:
             glow_surface.fill((255, 255, 255, 40))
             screen.blit(glow_surface, top_glow)
 
-        # 图标和文字 - 更现代的布局
-        icon_font = pygame.font.SysFont("arial", int(24 * self.scale_factor))
-        icon_surface = icon_font.render(area_data['icon'], True, self.colors['accent'])
-        icon_rect = icon_surface.get_rect(center=(animated_rect.centerx, animated_rect.centery - int(12 * self.scale_factor)))
-        screen.blit(icon_surface, icon_rect)
-        
+        # 图标和文字 - 使用PNG图标的垂直布局
+        # 绘制PNG图标（在按钮上方70%区域）
+        icon_to_use = None
+        if area_data['icon'] == 'magic' and self.magic_icon:
+            icon_to_use = self.magic_icon
+        elif area_data['icon'] == 'shop' and self.shop_icon:
+            icon_to_use = self.shop_icon
+
+        if icon_to_use:
+            # 图标放在按钮上方70%的区域居中
+            icon_area_height = int(animated_rect.height * 0.85)
+            icon_x = animated_rect.centerx - icon_to_use.get_width() // 2
+            icon_y = animated_rect.y + (icon_area_height - icon_to_use.get_height()) // 2
+            screen.blit(icon_to_use, (icon_x, icon_y))
+        else:
+            # 如果图标加载失败，显示文字占位符
+            icon_font = pygame.font.SysFont("arial", int(32 * self.scale_factor))
+            fallback_text = "✨" if area_data['icon'] == 'magic' else "🛍️"
+            icon_surface = icon_font.render(fallback_text, True, self.colors['accent'])
+            icon_area_height = int(animated_rect.height * 0.85)
+            icon_rect = icon_surface.get_rect(center=(animated_rect.centerx, animated_rect.y + icon_area_height // 2))
+            screen.blit(icon_surface, icon_rect)
+
+        # 绘制文字（在按钮底部）
         title_color = self.colors['accent'] if is_hover else self.colors['text']
         title_surface = self.fonts['subtitle'].render(area_data['title'], True, title_color)
-        title_rect = title_surface.get_rect(center=(animated_rect.centerx, animated_rect.bottom - int(22 * self.scale_factor)))
+        title_rect = title_surface.get_rect(center=(animated_rect.centerx, animated_rect.bottom - int(30 * self.scale_factor)))
         screen.blit(title_surface, title_rect)
     
     def draw_pack_image_only(self, screen: pygame.Surface, pack_data: dict, index: int):
@@ -832,23 +998,58 @@ class HomePage:
         else:
             animated_rect = rect
         
-        # 高质量阴影
-        shadow_offset = 10 if is_hover else 8
-        shadow_rect = animated_rect.copy()
-        shadow_rect.x += shadow_offset
-        shadow_rect.y += shadow_offset
+        # # 高质量阴影
+        # shadow_offset = 10 if is_hover else 8
+        # shadow_rect = animated_rect.copy()
+        # shadow_rect.x += shadow_offset
+        # shadow_rect.y += shadow_offset
         
-        # 创建模糊阴影效果
-        shadow_surface = pygame.Surface((shadow_rect.width + 15, shadow_rect.height + 15), pygame.SRCALPHA)
-        for i in range(6):
-            alpha = (80 - i * 12) if is_hover else (50 - i * 8)
-            if alpha > 0:
-                pygame.draw.rect(shadow_surface, (0, 0, 0, alpha), 
-                               (i, i, shadow_rect.width - i*2, shadow_rect.height - i*2), 
-                               border_radius=15)
+        # # 创建模糊阴影效果
+        # shadow_surface = pygame.Surface((shadow_rect.width + 15, shadow_rect.height + 15), pygame.SRCALPHA)
+        # for i in range(6):
+        #     alpha = (80 - i * 12) if is_hover else (50 - i * 8)
+        #     if alpha > 0:
+        #         pygame.draw.rect(shadow_surface, (0, 0, 0, alpha), 
+        #                        (i, i, shadow_rect.width - i*2, shadow_rect.height - i*2), 
+        #                        border_radius=15)
         
-        screen.blit(shadow_surface, (shadow_rect.x - 7, shadow_rect.y - 7))
+        # screen.blit(shadow_surface, (shadow_rect.x - 7, shadow_rect.y - 7))
         
+        # 绘制椭圆羽化阴影
+        shadow_offset_y = int(25 * self.scale_factor)  # 阴影垂直偏移
+        shadow_width = int(animated_rect.width * 0.8)  # 阴影宽度（比卡包稍窄）
+        shadow_height = int(shadow_width * 0.3)        # 阴影高度（椭圆扁平）
+
+        # 阴影中心位置
+        shadow_center_x = animated_rect.centerx
+        shadow_center_y = animated_rect.bottom + shadow_offset_y
+
+        # 创建羽化效果 - 多层椭圆
+        feather_layers = 16  # 羽化层数
+        for i in range(feather_layers):
+            # 计算当前层的参数
+            layer_scale = 1.0 + (i * 0.075)  # 每层递增15%
+            layer_alpha = max(0, 30 - i * 1.875)  # 透明度递减
+            
+            # 当前层椭圆尺寸
+            layer_width = int(shadow_width * layer_scale)
+            layer_height = int(shadow_height * layer_scale)
+            
+            # 创建椭圆表面
+            if layer_alpha > 0:
+                ellipse_surface = pygame.Surface((layer_width, layer_height), pygame.SRCALPHA)
+                
+                # 绘制椭圆
+                pygame.draw.ellipse(
+                    ellipse_surface, 
+                    (0, 0, 0, layer_alpha),  # 黑色半透明
+                    (0, 0, layer_width, layer_height)
+                )
+                
+                # 绘制到屏幕
+                ellipse_rect = ellipse_surface.get_rect(center=(shadow_center_x, shadow_center_y))
+                screen.blit(ellipse_surface, ellipse_rect)
+
         # 绘制卡包图片
         if pack_data['image']:
             scaled_image = pygame.transform.scale(pack_data['image'], (animated_rect.width, animated_rect.height))
@@ -957,16 +1158,40 @@ class HomePage:
         
         # 重新加载字体（因为缩放因子改变了）
         self.fonts = self.load_fonts()
+
+        # 重新加载图标以适应新尺寸
+        self.load_icons()
         
         # 关闭所有弹出窗口（它们需要重新创建以适应新尺寸）
         self.close_all_windows()
         
         self.create_layout()
+
+        # 重新加载logo和副标题logo
+        self.load_logo()
+        # self.load_subtitle_logo()
     
+    # def update_windows(self, time_delta: float):
+    #     """更新所有活跃窗口"""
+    #     for window_name, window in self.active_windows.items():
+    #         if window and window.is_visible:
+    #             try:
+    #                 window.update(time_delta)
+    #             except Exception as e:
+    #                 print(f"⚠️ 更新窗口 {window_name} 时出错: {e}")
+
     def update_windows(self, time_delta: float):
         """更新所有活跃窗口"""
+        # 特殊处理开包窗口的更新
+        if self.active_windows['pack_opening'] and self.active_windows['pack_opening'].is_visible:
+            try:
+                self.active_windows['pack_opening'].update(time_delta)
+            except Exception as e:
+                print(f"⚠️ 更新开包窗口时出错: {e}")
+        
+        # 其他窗口更新
         for window_name, window in self.active_windows.items():
-            if window and window.is_visible:
+            if window_name != 'pack_opening' and window and window.is_visible:
                 try:
                     window.update(time_delta)
                 except Exception as e:
@@ -988,6 +1213,26 @@ class HomePage:
                 except Exception as e:
                     print(f"⚠️ 绘制窗口 {window_name} 自定义内容时出错: {e}")
     
+    def draw_logo(self, screen: pygame.Surface):
+        """绘制左上角Logo"""
+        logo_margin = int(28 * self.scale_factor) # logo边距
+        
+        # if self.logo:
+        #     # 主logo位置
+        logo_x = logo_margin + int(10 * self.scale_factor)  # 向右偏移一些
+        logo_y = logo_margin
+        screen.blit(self.logo, (logo_x, logo_y))
+            
+        #     # 如果有副标题logo，放在主logo下方
+        #     if self.subtitle_logo:
+        #         subtitle_y = logo_y + self.logo.get_height() + int(10 * self.scale_factor)
+        #         screen.blit(self.subtitle_logo, (logo_x, subtitle_y))
+        # elif self.subtitle_logo:
+        #     # 如果只有副标题logo
+        #     logo_x = logo_margin + int(10 * self.scale_factor)  # 向右偏移一些
+        #     logo_y = logo_margin
+        #     screen.blit(self.subtitle_logo, (logo_x, logo_y))
+
     def draw(self, screen: pygame.Surface, time_delta: float):
         """绘制主页"""
         # 更新UI管理器
@@ -1002,6 +1247,9 @@ class HomePage:
         # 更新窗口
         self.update_windows(time_delta)
         
+        # 绘制左上角logo
+        self.draw_logo(screen)
+
         # 绘制精灵（背景层）
         self.draw_sprite_area(screen)
         
@@ -1018,6 +1266,10 @@ class HomePage:
         
         # 绘制窗口自定义内容（在UI之上）
         self.draw_windows(screen)
+
+        # 添加开包窗口的特殊处理（因为它是全屏覆盖）
+        if self.active_windows['pack_opening'] and self.active_windows['pack_opening'].is_visible:
+            self.active_windows['pack_opening'].draw(screen)
 
         if self.ui_elements['shop_button']:
             real_rect = self.ui_elements['shop_button'].rect.move(

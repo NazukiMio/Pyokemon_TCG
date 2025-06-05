@@ -1,0 +1,29 @@
+🧬 类型（types）统计：
+  Grass: 395 张
+  Fire: 109 张
+  Water: 59 张
+  Colorless: 49 张
+  Psychic: 40 张
+  Lightning: 38 张
+  Metal: 25 张
+  Fighting: 18 张
+  Darkness: 17 张
+  Dragon: 8 张
+  Fairy: 3 张
+
+🎖️ 稀有度（rarity）统计：
+  Common: 262 张
+  Uncommon: 188 张
+  Rare Holo: 152 张
+  Promo: 38 张
+  Rare Holo EX: 26 张
+  Rare: 23 张
+  Ultra Rare: 19 张
+  Rare Holo GX: 15 张
+  Rare Secret: 15 张
+  Rare Holo V: 8 张
+  Rare Shiny: 8 张
+  Rare BREAK: 4 张
+  Rare Ultra: 4 张
+  Amazing Rare: 4 张
+  Rare Shining: 4 张
