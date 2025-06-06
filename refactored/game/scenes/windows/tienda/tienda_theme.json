@@ -1,0 +1,364 @@
+{
+    "defaults": {
+        "colours": {
+            "normal_bg": "#FFFFFF",
+            "normal_border": "#E5E7EB",
+            "normal_text": "#1F2937"
+        },
+        "font": {
+            "name": "arial",
+            "size": "14"
+        },
+        "misc": {
+            "shadow_width": "0"
+        }
+    },
+
+    "@shop_window": {
+        "colours": {
+            "normal_bg": "#F8F9FF",
+            "normal_border": "#5865F2"
+        },
+        "misc": {
+            "shape": "rounded_rectangle",
+            "shape_corner_radius": "20",
+            "border_width": "3",
+            "shadow_width": "0"
+        }
+    },
+
+    "@shop_window.title_bar": {
+        "colours": {
+            "normal_bg": "#5865F2",
+            "normal_text": "#FFFFFF",
+            "normal_border": "#5865F2"
+        },
+        "font": {
+            "name": "arial",
+            "size": "16",
+            "bold": "1"
+        },
+        "misc": {
+            "shape": "rounded_rectangle",
+            "shape_corner_radius": "20,20,0,0",
+            "border_width": "0",
+            "shadow_width": "0"
+        }
+    },
+
+    "@shop_window.close_button": {
+        "colours": {
+            "normal_bg": "#EF4444",
+            "hovered_bg": "#DC2626",
+            "normal_text": "#FFFFFF",
+            "hovered_text": "#FFFFFF",
+            "normal_border": "#EF4444",
+            "hovered_border": "#DC2626"
+        },
+        "font": {
+            "name": "arial",
+            "size": "12",
+            "bold": "1"
+        },
+        "misc": {
+            "shape": "rounded_rectangle",
+            "shape_corner_radius": "10",
+            "border_width": "0",
+            "shadow_width": "0"
+        }
+    },
+
+    "@shop_main_container": {
+        "colours": {
+            "normal_bg": "#FFFFFF",
+            "normal_border": "#E5E7EB"
+        },
+        "misc": {
+            "shape": "rounded_rectangle",
+            "shape_corner_radius": "15",
+            "border_width": "1",
+            "shadow_width": "0"
+        }
+    },
+
+    "@coins_label": {
+        "colours": {
+            "normal_text": "#D97706",
+            "normal_bg": "#FEF3C7",
+            "normal_border": "#F59E0B"
+        },
+        "font": {
+            "name": "arial",
+            "size": "16",
+            "bold": "1"
+        },
+        "misc": {
+            "shape": "rounded_rectangle",
+            "shape_corner_radius": "8",
+            "border_width": "1",
+            "shadow_width": "0"
+        }
+    },
+
+    "@gems_label": {
+        "colours": {
+            "normal_text": "#7C3AED",
+            "normal_bg": "#EDE9FE",
+            "normal_border": "#A78BFA"
+        },
+        "font": {
+            "name": "arial",
+            "size": "16",
+            "bold": "1"
+        },
+        "misc": {
+            "shape": "rounded_rectangle",
+            "shape_corner_radius": "8",
+            "border_width": "1",
+            "shadow_width": "0"
+        }
+    },
+
+    "@category_tab": {
+        "colours": {
+            "normal_bg": "#FFFFFF",
+            "hovered_bg": "#5865F2",
+            "selected_bg": "#5865F2",
+            "active_bg": "#5865F2",
+            "normal_text": "#5865F2",
+            "hovered_text": "#FFFFFF",
+            "selected_text": "#FFFFFF",
+            "active_text": "#FFFFFF",
+            "normal_border": "#E5E7EB",
+            "hovered_border": "#5865F2",
+            "selected_border": "#5865F2",
+            "active_border": "#5865F2"
+        },
+        "font": {
+            "name": "arial",
+            "size": "14",
+            "bold": "0"
+        },
+        "font:hovered": {
+            "name": "arial",
+            "size": "14",
+            "bold": "1"
+        },
+        "font:selected": {
+            "name": "arial",
+            "size": "14",
+            "bold": "1"
+        },
+        "misc": {
+            "shape": "rounded_rectangle",
+            "shape_corner_radius": "12",
+            "border_width": "2",
+            "shadow_width": "0"
+        }
+    },
+
+    "@items_container": {
+        "colours": {
+            "normal_bg": "#FAFBFF",
+            "normal_border": "#E5E7EB"
+        },
+        "misc": {
+            "shape": "rounded_rectangle",
+            "shape_corner_radius": "12",
+            "border_width": "1",
+            "shadow_width": "0"
+        }
+    },
+
+    "@item_panel": {
+        "colours": {
+            "normal_bg": "#FFFFFF",
+            "hovered_bg": "#F9FAFB",
+            "normal_border": "#E5E7EB",
+            "hovered_border": "#5865F2"
+        },
+        "misc": {
+            "shape": "rounded_rectangle",
+            "shape_corner_radius": "12",
+            "border_width": "2",
+            "shadow_width": "0"
+        }
+    },
+
+    "@item_name": {
+        "colours": {
+            "normal_text": "#1F2937",
+            "normal_bg": "#00000000"
+        },
+        "font": {
+            "name": "arial",
+            "size": "14",
+            "bold": "1"
+        }
+    },
+
+    "@item_description": {
+        "colours": {
+            "normal_text": "#6B7280",
+            "normal_bg": "#00000000"
+        },
+        "font": {
+            "name": "arial",
+            "size": "11",
+            "bold": "0"
+        }
+    },
+
+    "@buy_button": {
+        "colours": {
+            "normal_bg": "#5865F2",
+            "hovered_bg": "#4338CA",
+            "selected_bg": "#3730A3",
+            "active_bg": "#3730A3",
+            "normal_text": "#FFFFFF",
+            "hovered_text": "#FFFFFF",
+            "selected_text": "#FFFFFF",
+            "active_text": "#FFFFFF",
+            "normal_border": "#7C84FF",
+            "hovered_border": "#3730A3",
+            "selected_border": "#312E81",
+            "active_border": "#312E81"
+        },
+        "font": {
+            "name": "arial",
+            "size": "12",
+            "bold": "0"
+        },
+        "font:hovered": {
+            "name": "arial",
+            "size": "12",
+            "bold": "1"
+        },
+        "misc": {
+            "shape": "rounded_rectangle",
+            "shape_corner_radius": "8",
+            "border_width": "2",
+            "shadow_width": "0"
+        }
+    },
+
+    "@refresh_button": {
+        "colours": {
+            "normal_bg": "#10B981",
+            "hovered_bg": "#059669",
+            "selected_bg": "#047857",
+            "active_bg": "#047857",
+            "normal_text": "#FFFFFF",
+            "hovered_text": "#FFFFFF",
+            "selected_text": "#FFFFFF",
+            "active_text": "#FFFFFF",
+            "normal_border": "#34D399",
+            "hovered_border": "#047857",
+            "selected_border": "#065F46",
+            "active_border": "#065F46"
+        },
+        "font": {
+            "name": "arial",
+            "size": "12",
+            "bold": "0"
+        },
+        "font:hovered": {
+            "name": "arial",
+            "size": "12",
+            "bold": "1"
+        },
+        "misc": {
+            "shape": "rounded_rectangle",
+            "shape_corner_radius": "8",
+            "border_width": "2",
+            "shadow_width": "0"
+        }
+    },
+
+    "@close_button": {
+        "colours": {
+            "normal_bg": "#EF4444",
+            "hovered_bg": "#DC2626",
+            "selected_bg": "#B91C1C",
+            "active_bg": "#B91C1C",
+            "normal_text": "#FFFFFF",
+            "hovered_text": "#FFFFFF",
+            "selected_text": "#FFFFFF",
+            "active_text": "#FFFFFF",
+            "normal_border": "#F87171",
+            "hovered_border": "#B91C1C",
+            "selected_border": "#991B1B",
+            "active_border": "#991B1B"
+        },
+        "font": {
+            "name": "arial",
+            "size": "12",
+            "bold": "0"
+        },
+        "font:hovered": {
+            "name": "arial",
+            "size": "12",
+            "bold": "1"
+        },
+        "misc": {
+            "shape": "rounded_rectangle",
+            "shape_corner_radius": "8",
+            "border_width": "2",
+            "shadow_width": "0"
+        }
+    },
+
+    "window": {
+        "colours": {
+            "normal_bg": "#F8F9FF",
+            "normal_border": "#5865F2"
+        },
+        "misc": {
+            "shape": "rounded_rectangle",
+            "shape_corner_radius": "20",
+            "border_width": "3",
+            "shadow_width": "0"
+        }
+    },
+
+    "window.title_bar": {
+        "colours": {
+            "normal_bg": "#5865F2",
+            "normal_text": "#FFFFFF",
+            "normal_border": "#5865F2"
+        },
+        "font": {
+            "name": "arial",
+            "size": "16",
+            "bold": "1"
+        },
+        "misc": {
+            "shape": "rounded_rectangle",
+            "shape_corner_radius": "20,20,0,0",
+            "border_width": "0",
+            "shadow_width": "0"
+        }
+    },
+
+    "window.close_button": {
+        "colours": {
+            "normal_bg": "#EF4444",
+            "hovered_bg": "#DC2626",
+            "normal_text": "#FFFFFF",
+            "hovered_text": "#FFFFFF",
+            "normal_border": "#EF4444",
+            "hovered_border": "#DC2626"
+        },
+        "font": {
+            "name": "arial",
+            "size": "12",
+            "bold": "1"
+        },
+        "misc": {
+            "shape": "rounded_rectangle",
+            "shape_corner_radius": "10",
+            "border_width": "0",
+            "shadow_width": "0"
+        }
+    }
+}
