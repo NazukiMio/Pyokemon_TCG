@@ -464,7 +464,7 @@ class WelcomeScene:
         screen_width, screen_height = self.screen.get_size()
         
         # 在按钮位置显示引导文字
-        start_y = int(screen_height * 0.55)
+        start_y = int(screen_height * 0.65)
         text_y = start_y + 60
         
         text_color = (255, 255, 255)

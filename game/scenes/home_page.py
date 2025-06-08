@@ -362,7 +362,7 @@ class HomePage:
         
         # 加载所有可用的卡包图片
         available_packs = []
-        for i in range(1, 11):  # packet1.png 到 packet10.png
+        for i in range(1, 27):  # packet1.png 到 packet26.png
             pack_path = os.path.join(pack_dir, f"packet{i}.png")
             if os.path.exists(pack_path):
                 try:
@@ -1277,14 +1277,19 @@ class HomePage:
         # 绘制窗口自定义内容（在UI之上）
         self.draw_windows(screen)
 
-        # 添加开包窗口的特殊处理（因为它是全屏覆盖）
+        # # 添加开包窗口的特殊处理（因为它是全屏覆盖）
+        # if self.active_windows['pack_opening'] and self.active_windows['pack_opening'].is_visible:
+        #     self.active_windows['pack_opening'].draw(screen)
+
+        # if self.ui_elements['shop_button']:
+        #     real_rect = self.ui_elements['shop_button'].rect.move(
+        #         self.ui_elements['shop_button'].relative_rect.topleft
+        #     )
+
+        # 确保开包窗口在最顶层绘制（覆盖所有其他内容）
         if self.active_windows['pack_opening'] and self.active_windows['pack_opening'].is_visible:
             self.active_windows['pack_opening'].draw(screen)
-
-        if self.ui_elements['shop_button']:
-            real_rect = self.ui_elements['shop_button'].rect.move(
-                self.ui_elements['shop_button'].relative_rect.topleft
-            )
+            
             # print(f"[验证] 鼠标位置: {pygame.mouse.get_pos()}")
             # print(f"[验证] 按钮区域: {real_rect}")
             # print(f"[验证] 命中按钮: {real_rect.collidepoint(pygame.mouse.get_pos())}")

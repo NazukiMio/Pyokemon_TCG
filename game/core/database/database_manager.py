@@ -236,6 +236,41 @@ class DatabaseManager:
             ('Premium Pack', 'Contains 5 cards with at least 1 Rare', 200, 0, 5, 'Rare'),
             ('Ultra Pack', 'Contains 3 cards with guaranteed Ultra Rare', 0, 50, 3, 'Ultra Rare')
             ''')
+
+            # 战斗记录表
+            self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS battles (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                player1_id INTEGER NOT NULL,
+                player2_id INTEGER, -- NULL表示AI对战
+                player1_deck_id INTEGER,
+                player2_deck_id INTEGER,
+                winner_id INTEGER,
+                battle_type TEXT DEFAULT 'PVE', -- PVE或PVP
+                turn_count INTEGER DEFAULT 0,
+                battle_data TEXT, -- JSON格式的详细战斗数据
+                duration_seconds INTEGER,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                completed_at TIMESTAMP,
+                FOREIGN KEY (player1_id) REFERENCES users (id) ON DELETE CASCADE,
+                FOREIGN KEY (player2_id) REFERENCES users (id) ON DELETE CASCADE
+            )
+            ''')
+
+            # AI对手配置表
+            self.cursor.execute('''
+            CREATE TABLE IF NOT EXISTS ai_opponents (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                name TEXT NOT NULL,
+                difficulty TEXT DEFAULT 'easy', -- easy, medium, hard
+                deck_template TEXT, -- JSON格式的AI卡组模板
+                strategy_config TEXT, -- JSON格式的AI策略配置
+                avatar_image TEXT,
+                description TEXT,
+                is_active BOOLEAN DEFAULT 1,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            ''')
             
             # 创建索引
             self._create_indexes()
@@ -259,7 +294,11 @@ class DatabaseManager:
             "CREATE INDEX IF NOT EXISTS idx_pack_openings_user_id ON pack_openings(user_id)",
             "CREATE INDEX IF NOT EXISTS idx_daily_quests_user_date ON daily_quests(user_id, quest_date)",
             "CREATE INDEX IF NOT EXISTS idx_game_stats_user_id ON game_stats(user_id)",
-            "CREATE INDEX IF NOT EXISTS idx_user_achievements_user_id ON user_achievements(user_id)"
+            "CREATE INDEX IF NOT EXISTS idx_user_achievements_user_id ON user_achievements(user_id)",
+            "CREATE INDEX IF NOT EXISTS idx_battles_player1 ON battles(player1_id)",
+            "CREATE INDEX IF NOT EXISTS idx_battles_player2 ON battles(player2_id)",
+            "CREATE INDEX IF NOT EXISTS idx_battles_type ON battles(battle_type)",
+            "CREATE INDEX IF NOT EXISTS idx_ai_opponents_difficulty ON ai_opponents(difficulty)"
         ]
         
         for index_sql in indexes:
@@ -814,6 +853,75 @@ class DatabaseManager:
             print(f"获取卡组卡牌失败: {e}")
             return []
     
+    def create_battle_record(self, player1_id, player2_id, player1_deck_id, player2_deck_id, battle_type="PVE"):
+        """创建战斗记录"""
+        try:
+            self.cursor.execute('''
+            INSERT INTO battles (player1_id, player2_id, player1_deck_id, player2_deck_id, battle_type)
+            VALUES (?, ?, ?, ?, ?)
+            ''', (player1_id, player2_id, player1_deck_id, player2_deck_id, battle_type))
+            self.connection.commit()
+            return True, self.cursor.lastrowid
+        except sqlite3.Error as e:
+            print(f"创建战斗记录失败: {e}")
+            return False, str(e)
+
+    def update_battle_result(self, battle_id, winner_id, turn_count, battle_data, duration_seconds):
+        """更新战斗结果"""
+        try:
+            import json
+            self.cursor.execute('''
+            UPDATE battles 
+            SET winner_id = ?, turn_count = ?, battle_data = ?, duration_seconds = ?, completed_at = CURRENT_TIMESTAMP
+            WHERE id = ?
+            ''', (winner_id, turn_count, json.dumps(battle_data), duration_seconds, battle_id))
+            self.connection.commit()
+            return True
+        except sqlite3.Error as e:
+            print(f"更新战斗结果失败: {e}")
+            return False
+
+    def get_user_battles(self, user_id, limit=20):
+        """获取用户战斗历史"""
+        try:
+            self.cursor.execute('''
+            SELECT b.*, u1.username as player1_name, u2.username as player2_name,
+                d1.name as player1_deck_name, d2.name as player2_deck_name
+            FROM battles b
+            LEFT JOIN users u1 ON b.player1_id = u1.id
+            LEFT JOIN users u2 ON b.player2_id = u2.id
+            LEFT JOIN decks d1 ON b.player1_deck_id = d1.id
+            LEFT JOIN decks d2 ON b.player2_deck_id = d2.id
+            WHERE b.player1_id = ? OR b.player2_id = ?
+            ORDER BY b.created_at DESC
+            LIMIT ?
+            ''', (user_id, user_id, limit))
+            
+            battles = self.cursor.fetchall()
+            return [dict(battle) for battle in battles]
+        except sqlite3.Error as e:
+            print(f"获取用户战斗历史失败: {e}")
+            return []
+
+    def get_ai_opponents(self, difficulty=None):
+        """获取AI对手列表"""
+        try:
+            if difficulty:
+                self.cursor.execute(
+                    "SELECT * FROM ai_opponents WHERE difficulty = ? AND is_active = 1 ORDER BY name",
+                    (difficulty,)
+                )
+            else:
+                self.cursor.execute(
+                    "SELECT * FROM ai_opponents WHERE is_active = 1 ORDER BY difficulty, name"
+                )
+            
+            opponents = self.cursor.fetchall()
+            return [dict(opponent) for opponent in opponents]
+        except sqlite3.Error as e:
+            print(f"获取AI对手失败: {e}")
+            return []
+
     # 保留其他原有方法...
     def backup_database(self, backup_path=None):
         """备份数据库"""

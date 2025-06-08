@@ -2,7 +2,7 @@ import os
 from graphviz import Digraph
 
 def ask_exclusions():
-    print("请输入要排除的目录（多个目录用英文逗号 , 分隔），直接回车使用默认值：assets, development")
+    print("请输入要排除的目录（多个目录用英文逗号 , 分隔），直接回车使用默认值：assets, development, __pycache__, images, icons, sounds, fonts")
     print("Please enter folders to exclude (comma-separated), or press Enter to use default: assets, development")
     print("Por favor, introduzca carpetas para excluir (separadas por comas), o pulse Enter para usar: assets, development")
     print("除外するフォルダをカンマで指定してください。Enterキーでデフォルト（assets, development）を使います。")
@@ -10,7 +10,7 @@ def ask_exclusions():
     raw = input(">> ").strip()
     if raw:
         return {item.strip() for item in raw.split(",")}
-    return {"assets", "development"}
+    return {"assets", "development", "__pycache__", "images", "icons", "sounds", "fonts"}
 
 def generate_tree_lines(path, excluded, prefix=""):
     entries = [e for e in sorted(os.listdir(path)) if not e.startswith(".")]

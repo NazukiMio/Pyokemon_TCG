@@ -7,6 +7,15 @@ from dataclasses import dataclass
 from enum import Enum
 # from game.core.game_manager import GameManager
 
+# 导入字体管理器
+try:
+    from game.scenes.styles.fonts import font_manager
+    FONT_MANAGER_AVAILABLE = True
+    print("✅ 字体管理器导入成功")
+except ImportError:
+    FONT_MANAGER_AVAILABLE = False
+    print("⚠️ 字体管理器导入失败，使用默认字体")
+
 # 假设Theme在相对路径导入，你需要根据实际路径调整
 try:
     from game.scenes.styles.theme import Theme
@@ -153,29 +162,31 @@ class PackOpeningWindow:
         self._load_assets()
         self._setup_quality_configs()
 
+        # 加载字体
+        self._load_fonts()
+
     def _create_ui_components(self):
         """创建全屏布局的UI组件"""
         # 关闭按钮 - 右上角
-        close_size = 50
+        close_size = 30
         self.close_button = ModernButton(
-            pygame.Rect(self.screen_width - close_size - 30, 30, close_size, close_size),
-            "✕",
+            pygame.Rect(self.screen_width - close_size - 50, 20, close_size, close_size),
+            "",  # 空文本，我们用图标
             button_type="secondary"
         )
         
-        # 左右切换按钮 - 屏幕边缘
-        arrow_size = 70
-        arrow_y = self.screen_height // 2 - arrow_size // 2
+        # 左右切换按钮 - 全高度贴边
+        arrow_width = 40
         
         self.left_arrow_button = ModernButton(
-            pygame.Rect(50, arrow_y, arrow_size, arrow_size),
-            "‹",
+            pygame.Rect(0, 0, arrow_width, self.screen_height),  # 贴左边，全高度
+            "",  # 空文本，我们用图标
             button_type="secondary"
         )
         
         self.right_arrow_button = ModernButton(
-            pygame.Rect(self.screen_width - arrow_size - 50, arrow_y, arrow_size, arrow_size),
-            "›", 
+            pygame.Rect(self.screen_width - arrow_width, 0, arrow_width, self.screen_height),  # 贴右边，全高度
+            "",  # 空文本，我们用图标
             button_type="secondary"
         )
 
@@ -183,7 +194,7 @@ class PackOpeningWindow:
         """加载UI资源"""
         try:
             # UI图标
-            ui_icons = ["close", "gem", "gold_coin"]
+            ui_icons = ["close", "gem", "gold_coin", "left", "right", "close_white", "left_white", "right_white"]
             for icon in ui_icons:
                 path = f"assets/icons/ui/{icon}.png"
                 self.textures[icon] = pygame.image.load(path).convert_alpha()
@@ -204,7 +215,7 @@ class PackOpeningWindow:
 
             # 加载随机卡包图片
             self.packet_images = []
-            for i in range(1, 11):  # packet1 到 packet10
+            for i in range(1, 27):  # packet1 到 packet26
                 try:
                     packet_path = f"assets/images/packets/packet{i}.png"
                     packet_img = pygame.image.load(packet_path).convert_alpha()
@@ -315,6 +326,48 @@ class PackOpeningWindow:
                 "glow_color": (255, 215, 0, 140)
             }
         }
+
+    def _load_fonts(self):
+        """加载字体"""
+        if FONT_MANAGER_AVAILABLE:
+            try:
+                # 使用字体管理器获取开包专用字体
+                self.fonts = font_manager.get_pack_fonts(self.screen_height)
+                # 添加智能渲染方法的引用
+                self.render_text_smart = font_manager.render_text_smart
+                self.get_text_size_smart = font_manager.get_text_size_smart
+                print("✅ 开包窗口智能字体系统加载成功")
+            except Exception as e:
+                print(f"❌ 字体管理器加载失败: {e}")
+                self._load_fallback_fonts()
+        else:
+            self._load_fallback_fonts()
+    
+    def _load_fallback_fonts(self):
+        """加载备用字体"""
+        scale_factor = self.screen_height / 900
+        self.fonts = {
+            'pack_title': pygame.font.SysFont('arial', int(56 * scale_factor), bold=True),
+            'pack_subtitle': pygame.font.SysFont('arial', int(32 * scale_factor), bold=True),
+            'card_name': pygame.font.SysFont('arial', int(18 * scale_factor)),
+            'card_rarity': pygame.font.SysFont('arial', int(14 * scale_factor)),
+            'status_text': pygame.font.SysFont('arial', int(28 * scale_factor)),
+            'button_text': pygame.font.SysFont('arial', int(20 * scale_factor), bold=True),
+            'unicode_text': pygame.font.SysFont('arial', int(24 * scale_factor)),  # Unicode备用
+        }
+        
+        # 备用渲染方法
+        def fallback_render(text, size, color, font_type='body', antialias=True):
+            font = self.fonts.get('unicode_text', pygame.font.SysFont('arial', size))
+            return font.render(text, antialias, color)
+        
+        def fallback_size(text, size, font_type='body'):
+            font = self.fonts.get('unicode_text', pygame.font.SysFont('arial', size))
+            return font.size(text)
+        
+        self.render_text_smart = fallback_render
+        self.get_text_size_smart = fallback_size
+        print("⚠️ 使用备用系统字体")
 
     def show(self):
         """显示全屏开包界面"""
@@ -530,8 +583,8 @@ class PackOpeningWindow:
         if not self.is_visible:
             return
         
-        # 绘制深色半透明背景遮罩
-        GlassEffect.draw_dark_overlay(screen, alpha=int(self.overlay_alpha))
+        # 绘制深色半透明背景遮罩（增强遮盖效果）
+        GlassEffect.draw_dark_overlay(screen, alpha=min(200, int(self.overlay_alpha * 1.3)))
         
         # 绘制内容 - 无窗口边框
         self._draw_background_circle(screen)
@@ -640,7 +693,7 @@ class PackOpeningWindow:
         }
         
         title = quality_names.get(self.current_pack_quality, "Paquete")
-        font = pygame.font.Font(None, 56)
+        font = self.fonts['pack_title']
         title_color = self.quality_configs[self.current_pack_quality]["circle_color"]
         title_surface = font.render(title, True, title_color)
         title_rect = title_surface.get_rect(center=(self.screen_width // 2, 100 + self.content_offset_y))
@@ -660,13 +713,31 @@ class PackOpeningWindow:
         start_x = self.screen_width // 2 - total_width // 2
         start_y = self.screen_height - 220 + self.content_offset_y  # 下方位置
         
-        # 稀有度对应的现代边框颜色
+        # ✅ 完整的稀有度颜色映射（15种稀有度）
         rarity_colors = {
-            "Common": (156, 163, 175),      # 灰色
-            "Uncommon": (34, 197, 94),      # 绿色
-            "Rare": (59, 130, 246),         # 蓝色
-            "Epic": (147, 51, 234),         # 紫色
-            "Legendary": (245, 158, 11)     # 橙色
+            # 基础稀有度
+            "Common": (156, 163, 175),          # 灰色
+            "Uncommon": (34, 197, 94),          # 绿色  
+            "Rare": (59, 130, 246),             # 蓝色
+            
+            # 闪卡系列
+            "Rare Holo": (138, 43, 226),        # 紫色（闪卡）
+            "Rare Holo EX": (220, 38, 127),     # 粉红色（EX）
+            "Rare Holo GX": (239, 68, 68),      # 红色（GX）
+            "Rare Holo V": (251, 146, 60),      # 橙色（V卡）
+            
+            # 超稀有系列
+            "Ultra Rare": (245, 158, 11),       # 金色
+            "Rare Secret": (168, 85, 247),      # 深紫色（秘藏）
+            "Rare Ultra": (252, 211, 77),       # 亮金色
+            
+            # 特殊系列
+            "Promo": (16, 185, 129),            # 青绿色（推广）
+            "Rare Shiny": (192, 132, 252),      # 亮紫色（闪亮）
+            "Rare BREAK": (248, 113, 113),      # 珊瑚红（BREAK）
+            "Rare Shining": (255, 215, 0),      # 金黄色（闪耀）
+            "Amazing Rare": (236, 72, 153),     # 洋红色（惊奇）
+            "Rare Prism Star": (139, 69, 19)    # 棕色（棱镜星）
         }
         
         # 绘制每张卡牌
@@ -680,36 +751,187 @@ class PackOpeningWindow:
                 radius=Theme.get_size('border_radius_medium')
             )
             
-            # 稀有度边框
-            border_color = rarity_colors.get(card.rarity, (156, 163, 175))
+            # ✅ 加载并绘制卡牌图片（兼容字典和对象格式）
+            card_image = None
+            
+            # 🔑 兼容字典和对象两种格式
+            card_image_path = None
+            if isinstance(card, dict):
+                # 字典格式（从GameManager传来的）
+                card_image_path = card.get('image')
+                card_name = card.get('name', 'Unknown')
+                card_id = card.get('id', 'unknown')
+                card_rarity = card.get('rarity', 'Common')
+            else:
+                # 对象格式
+                card_image_path = getattr(card, 'image', None) or getattr(card, 'image_path', None)
+                card_name = getattr(card, 'name', 'Unknown')
+                card_id = getattr(card, 'id', 'unknown')
+                card_rarity = getattr(card, 'rarity', 'Common')
+            
+            # print(f"🖼️ 检查卡牌数据格式:")
+            # print(f"  卡牌类型: {type(card)}")
+            # print(f"  卡牌名称: {card_name}")
+            # print(f"  图片路径: '{card_image_path}'")
+            
+            if card_image_path:
+                import os
+                try:
+                    # ✅ 保持原始路径格式（Windows或Unix）
+                    image_path = card_image_path
+                    
+                    # print(f"🖼️ 最终图片路径: '{image_path}'")
+                    
+                    # 加载卡牌图片
+                    if os.path.exists(image_path):
+                        original_image = pygame.image.load(image_path)
+                        # 缩放图片适应卡牌区域，保持宽高比
+                        image_width = card_width - 12  # 留边距
+                        image_height = int(image_width * 330 / 240)  # 保持240:330比例
+                        
+                        # 如果图片太高，按高度缩放
+                        max_image_height = card_height - 60  # 为名称和稀有度留空间
+                        if image_height > max_image_height:
+                            image_height = max_image_height
+                            image_width = int(image_height * 240 / 330)
+                        
+                        card_image = pygame.transform.smoothscale(original_image, (image_width, image_height))
+                        # print(f"✅ 成功加载卡牌图片: {card_name} - {card_image_path}")
+                    else:
+                        print(f"❌ 卡牌图片文件不存在: {card_image_path}")
+                except Exception as e:
+                    print(f"❌ 加载卡牌图片失败 {getattr(card, 'id', 'unknown')}: {e}")
+            else:
+                print(f"❌ 卡牌没有图片路径: {getattr(card, 'name', 'unknown')}")
+            
+            # 绘制卡牌图片
+            if card_image:
+                # 居中显示图片
+                image_x = card_rect.centerx - card_image.get_width() // 2
+                image_y = card_rect.y + 6  # 顶部留一点边距
+                screen.blit(card_image, (image_x, image_y))
+            else:
+                # ✅ 如果没有图片，绘制占位符
+                placeholder_rect = pygame.Rect(
+                    card_rect.x + 6, card_rect.y + 6,
+                    card_width - 12, card_height - 60
+                )
+                pygame.draw.rect(screen, (64, 64, 64), placeholder_rect, border_radius=8)
+                
+                # 绘制"无图片"文字
+                no_image_font = pygame.font.Font(None, 24)
+                no_image_text = no_image_font.render("No Image", True, (128, 128, 128))
+                no_image_rect = no_image_text.get_rect(center=placeholder_rect.center)
+                screen.blit(no_image_text, no_image_rect)
+            
+            # ✅ 稀有度边框（使用完整的颜色映射）
+            border_color = rarity_colors.get(card_rarity, (156, 163, 175))  # 默认灰色
             border_surface = pygame.Surface((card_width, card_height), pygame.SRCALPHA)
             pygame.draw.rect(border_surface, border_color + (200,),
-                           (0, 0, card_width, card_height), 
-                           width=4, border_radius=Theme.get_size('border_radius_medium'))
+                        (0, 0, card_width, card_height), 
+                        width=4, border_radius=Theme.get_size('border_radius_medium'))
             screen.blit(border_surface, card_rect.topleft)
             
-            # 卡牌名称
-            name_font = pygame.font.Font(None, 20)
-            name_text = name_font.render(card.name[:10], True, (255, 255, 255))
-            name_rect = name_text.get_rect(center=(card_rect.centerx, card_rect.bottom - 15))
+            # 卡牌名称（缩短显示）
+            name_font = self.fonts['card_name']
+            display_name = card_name[:12] + "..." if len(card_name) > 12 else card_name
+            name_text = name_font.render(display_name, True, (255, 255, 255))
+            name_rect = name_text.get_rect(center=(card_rect.centerx, card_rect.bottom - 25))
             screen.blit(name_text, name_rect)
             
-            # 稀有度标识
-            rarity_font = pygame.font.Font(None, 16)
-            rarity_text = rarity_font.render(card.rarity, True, border_color)
-            rarity_rect = rarity_text.get_rect(center=(card_rect.centerx, card_rect.bottom - 35))
+            # ✅ 稀有度标识（缩短显示）
+            rarity_font = self.fonts['card_rarity']
+            display_rarity = card_rarity
+            # 缩短长稀有度名称
+            if len(display_rarity) > 12:
+                rarity_shortcuts = {
+                    "Rare Holo EX": "EX",
+                    "Rare Holo GX": "GX", 
+                    "Rare Holo V": "V",
+                    "Rare Secret": "Secret",
+                    "Rare Shiny": "Shiny",
+                    "Rare BREAK": "BREAK",
+                    "Rare Ultra": "Ultra",
+                    "Amazing Rare": "Amazing",
+                    "Rare Shining": "Shining",
+                    "Rare Prism Star": "Prism★"
+                }
+                display_rarity = rarity_shortcuts.get(display_rarity, display_rarity[:8])
+            
+            rarity_text = rarity_font.render(display_rarity, True, border_color)
+            rarity_rect = rarity_text.get_rect(center=(card_rect.centerx, card_rect.bottom - 10))
             screen.blit(rarity_text, rarity_rect)
+            
+            # ✅ 添加稀有度光效（可选）
+            if card_rarity in ["Ultra Rare", "Rare Secret", "Amazing Rare", "Rare Shining"]:
+                # 绘制闪光效果
+                glow_surface = pygame.Surface((card_width + 8, card_height + 8), pygame.SRCALPHA)
+                glow_color = border_color + (60,)
+                pygame.draw.rect(glow_surface, glow_color,
+                            (0, 0, card_width + 8, card_height + 8),
+                            width=6, border_radius=Theme.get_size('border_radius_medium') + 2)
+                screen.blit(glow_surface, (card_rect.x - 4, card_rect.y - 4))
 
     def _draw_ui_elements(self, screen):
         """绘制UI元素"""
         # 绘制交互按钮
-        if self.animation_state == AnimationState.SELECTION:
-            self.left_arrow_button.draw(screen)
-            self.right_arrow_button.draw(screen)
+        # if self.animation_state == AnimationState.SELECTION:
+        #     self.left_arrow_button.draw(screen)
+        #     self.right_arrow_button.draw(screen)
         
-        # 关闭按钮（完成后显示）
+        # # 关闭按钮（完成后显示）
+        # if self.can_close:
+        #     self.close_button.draw(screen)
+        # 绘制交互按钮（使用已创建按钮的rect）
+        if self.animation_state == AnimationState.SELECTION:
+            # 左箭头 - 使用按钮rect
+            left_rect = self.left_arrow_button.rect
+            left_hover = left_rect.collidepoint(pygame.mouse.get_pos())
+            left_alpha = 100 if left_hover else 60
+
+            left_surface = pygame.Surface(left_rect.size, pygame.SRCALPHA)
+            left_surface.fill((0, 0, 0, left_alpha))
+            screen.blit(left_surface, left_rect)
+
+            # 绘制左箭头图标（根据hover状态选择）
+            if left_hover and 'left_white' in self.textures:
+                icon_center_x = left_rect.center[0] + 10  # 向右偏移15像素
+                icon_rect = self.textures['left_white'].get_rect(center=(icon_center_x, left_rect.center[1]))
+                screen.blit(self.textures['left_white'], icon_rect)
+            elif 'left' in self.textures:
+                icon_center_x = left_rect.center[0] + 10  # 向右偏移15像素
+                icon_rect = self.textures['left'].get_rect(center=(icon_center_x, left_rect.center[1]))
+                screen.blit(self.textures['left'], icon_rect)
+
+            # 右箭头 - 使用按钮rect
+            right_rect = self.right_arrow_button.rect
+            right_hover = right_rect.collidepoint(pygame.mouse.get_pos())
+            right_alpha = 100 if right_hover else 60
+
+            right_surface = pygame.Surface(right_rect.size, pygame.SRCALPHA)
+            right_surface.fill((0, 0, 0, right_alpha))
+            screen.blit(right_surface, right_rect)
+
+            # 绘制右箭头图标（根据hover状态选择）
+            if right_hover and 'right_white' in self.textures:
+                icon_rect = self.textures['right_white'].get_rect(center=right_rect.center)
+                screen.blit(self.textures['right_white'], icon_rect)
+            elif 'right' in self.textures:
+                icon_rect = self.textures['right'].get_rect(center=right_rect.center)
+                screen.blit(self.textures['right'], icon_rect)
+        
+        # 关闭按钮 - 使用按钮rect，hover时换图标
         if self.can_close:
-            self.close_button.draw(screen)
+            close_rect = self.close_button.rect
+            close_hover = close_rect.collidepoint(pygame.mouse.get_pos())
+            
+            # 根据hover状态选择图标
+            if close_hover and 'close_white' in self.textures:
+                # hover时使用亮色图标
+                screen.blit(self.textures['close_white'], close_rect)
+            elif 'close' in self.textures:
+                # 正常时使用普通图标
+                screen.blit(self.textures['close'], close_rect)
         
         # 状态提示 - 屏幕下方
         status_messages = {
@@ -720,15 +942,28 @@ class PackOpeningWindow:
             AnimationState.COMPLETED: f"¡Obtienes {len(self.obtained_cards)} cartas!"
         }
         
+        # status_text = status_messages.get(self.animation_state, "")
+        # if status_text and self.animation_state != AnimationState.COMPLETED:
+        #     font = self.fonts['status_text']
+        #     text_surface = font.render(status_text, True, (255, 255, 255))
+        #     text_rect = text_surface.get_rect(center=(self.screen_width // 2, self.screen_height - 80 + self.content_offset_y))
+        #     screen.blit(text_surface, text_rect)
+
+        # 渲染状态文本
         status_text = status_messages.get(self.animation_state, "")
         if status_text and self.animation_state != AnimationState.COMPLETED:
-            font = pygame.font.Font(None, 28)
-            text_surface = font.render(status_text, True, (255, 255, 255))
+            # 使用智能渲染，自动处理emoji和特殊字符
+            if hasattr(self, 'render_text_smart'):
+                text_surface = self.render_text_smart(status_text, 28, (255, 255, 255), 'body')
+            else:
+                font = self.fonts['status_text']
+                text_surface = font.render(status_text, True, (255, 255, 255))
+            
             text_rect = text_surface.get_rect(center=(self.screen_width // 2, self.screen_height - 80 + self.content_offset_y))
             screen.blit(text_surface, text_rect)
 
 # 测试用例
-if __name__ == "__main__":
+# if __name__ == "__main__":
     # class MockGameManager:
     #     def __init__(self):
     #         self.user_packs = {"basic": 5, "premium": 3, "legendary": 1}
@@ -773,4 +1008,4 @@ if __name__ == "__main__":
         
     #     pygame.display.flip()
     
-    pygame.quit()
+    # pygame.quit()

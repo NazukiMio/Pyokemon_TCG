@@ -2,12 +2,12 @@ pokemon_tcg_python_refactored/
 ├── README.md
 ├── assets                                                      # 内容物太多，不展示，为媒体文件
 ├── card_assets                                                 # 内容物太多，不展示，为卡牌相关媒体文件
+├── development/                                                # 内容物为其他开发工具，数据爬虫等，与项目运行无关，不展示
 ├── config/
 │   └── __init__.py
 ├── data/
 │   ├── backup/
 │   └── game_database.db
-├── development/                                                # 内容物为其他开发工具，数据爬虫等，与项目运行无关，不展示
 ├── docs/
 ├── game/
 │   ├── __init__.py

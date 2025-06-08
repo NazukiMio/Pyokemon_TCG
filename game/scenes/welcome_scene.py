@@ -66,6 +66,10 @@ class WelcomeScene:
         self.transition_intro = False
         self.intro_text = "Presiona cualquier tecla para comenzar"
 
+        # 加载引导图片
+        self.press_start_image = None
+        self.load_press_start_image()
+
         # 设置UI元素
         self.setup_ui_elements()
         
@@ -137,6 +141,44 @@ class WelcomeScene:
                     "shape_corner_radius": "12",
                     "border_width": "3",
                     "shadow_width": "0"
+                }
+            },
+            "#exit_dialog": {
+                "colours": {
+                    "normal_bg": "#FAFBFC",           # 非常浅的灰白色
+                    "normal_border": "#E1E5E9",       # 浅边框
+                    "dark_bg": "#F5F7FA"              # 稍深一点的背景
+                },
+                "misc": {
+                    "shape": "rounded_rectangle",
+                    "shape_corner_radius": "16",      # 稍小的圆角更现代
+                    "border_width": "1",              # 更细的边框
+                    "shadow_width": "12",             # 更大的阴影更有层次
+                    "shadow_colour": "#00000015"      # 更淡的阴影
+                }
+            },
+            # 添加对话框标题样式
+            "#dialog_title": {
+                "colours": {
+                    "normal_text": "#1F2937",         # 深灰色文字
+                    "normal_bg": "transparent"
+                },
+                "font": {
+                    "name": "arial",
+                    "size": "24",
+                    "bold": "1"
+                }
+            },
+            # 添加对话框消息样式
+            "#dialog_message": {
+                "colours": {
+                    "normal_text": "#6B7280",         # 中等灰色文字
+                    "normal_bg": "transparent"
+                },
+                "font": {
+                    "name": "arial",
+                    "size": "16",
+                    "bold": "0"
                 }
             }
         }
@@ -210,6 +252,30 @@ class WelcomeScene:
         except Exception as e:
             print(f"⚠️ 副标题Logo加载失败: {e}")
     
+    def load_press_start_image(self):
+        """加载Press Start图片"""
+        try:
+            press_path = os.path.join("assets", "icons", "ui", "press.png")
+            if os.path.exists(press_path):
+                self.press_start_image = pygame.image.load(press_path)
+                # 根据屏幕大小调整图片尺寸
+                screen_width, screen_height = self.screen.get_size()
+                # 基础宽度为屏幕宽度的20%，但不超过400px
+                target_width = int(min(screen_width * 0.2, 400))
+                # 保持宽高比
+                original_width, original_height = self.press_start_image.get_size()
+                target_height = int(target_width * (original_height / original_width))
+                
+                self.press_start_image = pygame.transform.smoothscale(
+                    self.press_start_image, 
+                    (target_width, target_height)
+                )
+                print("✅ Press Start图片加载成功")
+            else:
+                print(f"⚠️ Press Start图片文件不存在: {press_path}")
+        except Exception as e:
+            print(f"⚠️ Press Start图片加载失败: {e}")
+
     def setup_ui_elements(self):
         """设置UI元素"""
         screen_width, screen_height = self.screen.get_size()
@@ -258,48 +324,62 @@ class WelcomeScene:
         """设置退出确认对话框"""
         screen_width, screen_height = self.screen.get_size()
         
-        dialog_width = int(min(500 * self.scale_factor, screen_width * 0.8))
-        dialog_height = int(min(250 * self.scale_factor, screen_height * 0.45))
+        # 增加对话框尺寸
+        dialog_width = int(min(500 * self.scale_factor, screen_width * 0.85))
+        dialog_height = int(min(320 * self.scale_factor, screen_height * 0.55))  # 再增加高度
         dialog_x = (screen_width - dialog_width) // 2
         dialog_y = (screen_height - dialog_height) // 2
         
-        # 创建对话框面板
+        # 创建对话框面板（应用新样式）
         self.exit_dialog_elements['panel'] = pygame_gui.elements.UIPanel(
             relative_rect=pygame.Rect(dialog_x, dialog_y, dialog_width, dialog_height),
-            manager=self.ui_manager
+            manager=self.ui_manager,
+            object_id='#exit_dialog'
         )
         
         # 标题标签
         self.exit_dialog_elements['title'] = pygame_gui.elements.UILabel(
-            relative_rect=pygame.Rect(20, 20, dialog_width - 40, 40),
+            relative_rect=pygame.Rect(30, 30, dialog_width - 60, 40),
             text='Confirmar salida',
             container=self.exit_dialog_elements['panel'],
-            manager=self.ui_manager
+            manager=self.ui_manager,
+            object_id='#dialog_title'
         )
         
         # 消息标签
         self.exit_dialog_elements['message'] = pygame_gui.elements.UILabel(
-            relative_rect=pygame.Rect(20, 70, dialog_width - 40, 60),
+            relative_rect=pygame.Rect(30, 80, dialog_width - 60, 80),
             text='¿Estás seguro de que quieres salir del juego?',
             container=self.exit_dialog_elements['panel'],
-            manager=self.ui_manager
+            manager=self.ui_manager,
+            object_id='#dialog_message'
         )
         
-        # 按钮
-        button_width = int(dialog_width * 0.35)
+        # 按钮（更大的边距）
+        button_width = int(dialog_width * 0.3)       # 再缩小按钮宽度
         button_height = Theme.get_scaled_size('button_height_medium', self.scale_factor)
-        button_y = dialog_height - button_height - 20
+        button_margin = 40                           # 增加边距到40
+        bottom_margin = 50                           # 底部边距设为50
+        button_spacing = 20  # 按钮之间的间距
+        total_buttons_width = button_width * 2 + button_spacing
+        start_x = (dialog_width - total_buttons_width) // 2
         
+        # 计算按钮位置
+        button_y = dialog_height - button_height - bottom_margin
+        
+        # 左侧按钮（SÍ, SALIR）
         self.exit_dialog_elements['yes'] = pygame_gui.elements.UIButton(
-            relative_rect=pygame.Rect(20, button_y, button_width, button_height),
+            relative_rect=pygame.Rect(start_x, button_y, button_width, button_height),
             text='SÍ, SALIR',
             container=self.exit_dialog_elements['panel'],
             manager=self.ui_manager,
             object_id='#main_button'
         )
         
+        # 右侧按钮（CANCELAR）- 确保右边距足够
+        right_button_x = dialog_width - button_width - button_margin
         self.exit_dialog_elements['no'] = pygame_gui.elements.UIButton(
-            relative_rect=pygame.Rect(dialog_width - button_width - 20, button_y, button_width, button_height),
+            relative_rect=pygame.Rect(start_x + button_width + button_spacing, button_y, button_width, button_height),
             text='CANCELAR',
             container=self.exit_dialog_elements['panel'],
             manager=self.ui_manager,
@@ -387,6 +467,10 @@ class WelcomeScene:
         # 重新加载Logo
         if self.logo:
             self.load_logo()
+
+        # 重新加载Press Start图片
+        if self.press_start_image:
+            self.load_press_start_image()
     
     def handle_login_click(self):
         """处理登录按钮点击"""
@@ -426,10 +510,15 @@ class WelcomeScene:
         # 更新引导层
         if self.show_intro:
             if not self.transition_intro:
-                # 呼吸效果
+                # 呼吸效果（图片版本）
                 self.intro_time += dt
-                breath = (math.sin(self.intro_time * 3) + 1) / 2
-                self.intro_alpha = int(100 + breath * 155)
+                breath = (math.sin(self.intro_time * 2.5) + 1) / 2  # 稍微慢一点
+                if self.press_start_image:
+                    # 图片的透明度变化范围可以更大
+                    self.intro_alpha = int(0 + breath * 255)  # 120-255
+                else:
+                    # 文字保持原来的范围
+                    self.intro_alpha = int(100 + breath * 155)  # 100-255
             else:
                 # 引导层淡出
                 fade_speed = 400
@@ -489,20 +578,38 @@ class WelcomeScene:
             self.toast_message.draw(self.screen, screen_width // 2, int(screen_height * 0.85), self.scale_factor)
 
     def draw_intro_text(self):
-        """绘制引导文字"""
+        """绘制引导图片/文字"""
         screen_width, screen_height = self.screen.get_size()
         
-        # 在按钮位置显示引导文字
-        start_y = int(screen_height * 0.55)
-        text_y = start_y + 60
+        # 在按钮位置显示引导内容
+        start_y = int(screen_height * 0.75)
+        content_y = start_y + 60
         
-        text_color = (255, 255, 255)
-        text_surface = font_manager.render_text(
-            self.intro_text, 'xl', screen_height, text_color
-        )
-        text_surface.set_alpha(int(self.intro_alpha))
-        text_rect = text_surface.get_rect(center=(screen_width // 2, text_y))
-        self.screen.blit(text_surface, text_rect)
+        if self.press_start_image:
+            # 使用图片
+            # 创建带透明度的图片副本
+            image_with_alpha = self.press_start_image.copy()
+            image_with_alpha.set_alpha(int(self.intro_alpha))
+            
+            # 居中显示
+            image_rect = image_with_alpha.get_rect(center=(screen_width // 2, content_y))
+            self.screen.blit(image_with_alpha, image_rect)
+        else:
+            # 后备文字方案
+            text_color = (255, 255, 255)
+            
+            # 计算合适的字体大小
+            scale_factor = screen_height / 900
+            font_size = int(24 * scale_factor)  # 24px基础大小
+            
+            # 使用智能渲染
+            text_surface = font_manager.render_text_smart(
+                self.intro_text, font_size, text_color, 'body'
+            )
+            
+            text_surface.set_alpha(int(self.intro_alpha))
+            text_rect = text_surface.get_rect(center=(screen_width // 2, content_y))
+            self.screen.blit(text_surface, text_rect)
 
     def draw_background(self):
         """绘制背景"""

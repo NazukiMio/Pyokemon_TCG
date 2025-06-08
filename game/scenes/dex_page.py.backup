@@ -59,16 +59,10 @@ class DexColors:
 class CardDisplay:
     """卡牌显示组件 - 性能优化版本"""
     
-    def __init__(self, card: Card, card_manager, collection_data: Dict[str, Any] = None, game_manager=None):
+    def __init__(self, card: Card, card_manager, collection_data: Dict[str, Any] = None):
         self.card = card
-        self.card_manager = card_manager  # card_manager引用
-        self.game_manager = game_manager  # game_manager引用
+        self.card_manager = card_manager  # 👈 添加card_manager引用
         self.collection_data = collection_data or {}
-        
-        # # 🆕 添加调试信息
-        # print(f"🎨 创建CardDisplay: {card.name}")
-        # print(f"🔍 CardDisplay接收到的game_manager: {type(self.game_manager)}")
-        # print(f"🔍 card_manager有game_manager: {hasattr(self.card_manager, 'game_manager')}")
         
         # 显示属性
         self.width = 120
@@ -95,33 +89,24 @@ class CardDisplay:
         self._create_static_surfaces()
     
     def _create_static_surfaces(self):
-        """预创建静态表面（使用缓存优化）"""
+        """预创建静态表面"""
+        # 加载卡牌图片 - 使用CardManager的方法
         self.card_image = None
         if hasattr(self.card, 'id') and self.card.id:
+            # 👈 关键：需要传入card_manager引用
             image_path = self.card_manager.get_card_image_path(self.card.id)
-            
             if image_path and os.path.exists(image_path):
-                # 优先使用缓存系统
-                if self.game_manager and hasattr(self.game_manager, 'get_cached_image'):
-                    cached_image = self.game_manager.get_cached_image(image_path)
-                    if cached_image:
-                        img_width = self.width - 8
-                        img_height = int(img_width * 330 / 240)
-                        self.card_image = pygame.transform.smoothscale(cached_image, (img_width, img_height))
-                        # print(f"✅ 缓存加载: {self.card.name}")  # 可选：保留简单日志
-                    else:
-                        print(f"❌ 缓存失败: {self.card.name}")
-                
-                # 🆕 保留备用方案（但通常不会执行）
-                if self.card_image is None:
-                    print(f"⚠️ 使用备用加载: {self.card.name}")
-                    try:
-                        original_image = pygame.image.load(image_path)
-                        img_width = self.width - 8
-                        img_height = int(img_width * 330 / 240)
-                        self.card_image = pygame.transform.smoothscale(original_image, (img_width, img_height))
-                    except Exception as e:
-                        print(f"❌ 备用加载失败: {e}")
+                try:
+                    original_image = pygame.image.load(image_path)
+                    # 缩放到显示尺寸，保持宽高比
+                    img_width = self.width - 8
+                    img_height = int(img_width * 330 / 240)  # 保持240:330比例
+                    self.card_image = pygame.transform.smoothscale(original_image, (img_width, img_height))
+                    print(f"✅ 成功加载图片: {self.card.name} - {image_path}")
+                except Exception as e:
+                    print(f"❌ 加载卡牌图片失败 {self.card.id}: {e}")
+            else:
+                print(f"❌ 图片文件不存在: {image_path}")
         
         # 预渲染稀有度颜色
         self.rarity_color = self._get_rarity_color()
@@ -304,11 +289,6 @@ class DexPage:
         self.game_manager = game_manager
         self.nav_bar_height = nav_bar_height
 
-        # 🆕 验证传入的card_manager
-        print(f"🔍 DexPage接收到的CardManager有game_manager: {hasattr(self.card_manager, 'game_manager')}")
-        print(f"🔍 DexPage接收到的CardManager类型: {type(self.card_manager)}")
-        print(f"🔍 DexPage接收到的GameManager类型: {type(self.game_manager)}")
-
         # 从game_manager获取db_manager（更好的方式）
         self.db_manager = game_manager.db_manager if hasattr(game_manager, 'db_manager') else None
         
@@ -358,14 +338,6 @@ class DexPage:
         self.completion_rate = 0.0
         
         print("🔍 初始化DexPage...")
-
-        # 添加缓存版本控制
-        if self.game_manager:
-            self._cached_version = self.game_manager.get_card_cache_version()
-            print(f"🔄 初始化DexPage，同步缓存版本: v{self._cached_version}")
-        else:
-            self._cached_version = 0
-        self._card_displays_pool = {}  # CardDisplay对象池
         
         # 初始化数据
         self._load_card_data()
@@ -377,37 +349,23 @@ class DexPage:
         # # 添加页面可见性控制
         # self.is_active = False  # 页面是否活跃
 
-        # # 初始化数据
-        # self._load_card_data()
-
         print(f"✅ DexPage初始化完成 - {len(self.all_cards)} 张卡牌")
     
     def _load_card_data(self):
-        """从缓存加载卡牌数据（性能优化）"""
+        """加载卡牌数据"""
         try:
-            if self.game_manager:
-                current_version = self.game_manager.get_card_cache_version()
-                
-                # 检查是否需要重新加载
-                if self._cached_version != current_version:
-                    print(f"🔄 检测到卡牌缓存更新 (v{self._cached_version} → v{current_version})")
-                    self._cached_version = current_version
-                    # 清理CardDisplay对象池
-                    self._card_displays_pool.clear()
-                else:
-                    print("✅ 使用卡牌缓存数据")
-                
-                # 🆕 无论版本是否变化，都要确保有卡牌数据
-                self.all_cards = self.game_manager.get_cached_cards()
+            if self.card_manager:
+                # 使用CardManager获取卡牌
+                self.all_cards = self.card_manager.search_cards(limit=10000)
+                print(f"从CardManager加载了 {len(self.all_cards)} 张卡牌")
             else:
-                print("⚠️ GameManager不可用")
+                print("⚠️ CardManager不可用")
                 self.all_cards = []
         except Exception as e:
             print(f"❌ 加载卡牌数据失败: {e}")
             self.all_cards = []
         
         self.total_cards = len(self.all_cards)
-        print(f"📊 最终加载: {self.total_cards} 张卡牌")  # 🆕 确认数据加载
     
     # def _load_user_collection(self):
     #     """加载用户收集数据"""
@@ -699,37 +657,13 @@ class DexPage:
         print(f"过滤结果: {len(self.filtered_cards)}/{len(self.all_cards)} 张卡牌")
     
     def _create_card_displays(self):
-        """创建卡牌显示组件（使用对象池优化）"""
-        print(f"🏭 开始创建CardDisplay对象，总数: {len(self.filtered_cards)}")
+        """创建卡牌显示组件"""
         self.card_displays = []
         
         for card in self.filtered_cards:
-            card_id = getattr(card, 'id', '')
-            collection_data = self.user_collection.get(card_id, {})
-            
-            # 使用对象池避免重复创建
-            if card_id not in self._card_displays_pool:
-                # print(f"🆕 创建新的CardDisplay: {card.name} (ID: {card_id})")
-                self._card_displays_pool[card_id] = CardDisplay(
-                    card, 
-                    self.card_manager, 
-                    collection_data,
-                    game_manager=self.game_manager  # 🆕 确保传递game_manager
-                )
-            else:
-                print(f"♻️ 重用CardDisplay: {card.name} (ID: {card_id})")
-                # 更新现有对象的收集数据
-                display = self._card_displays_pool[card_id]
-                display.collection_data = collection_data
-                display.quantity = collection_data.get('quantity', 0)
-                display.is_owned = display.quantity > 0
-                display.obtained_at = collection_data.get('obtained_at')
-                display._render_text()
-                display._cache_dirty = True
-            
-            self.card_displays.append(self._card_displays_pool[card_id])
-        
-        print(f"📦 CardDisplay对象池: {len(self._card_displays_pool)} 个对象")
+            collection_data = self.user_collection.get(getattr(card, 'id', ''), {})
+            card_display = CardDisplay(card, self.card_manager, collection_data)  # 👈 传入card_manager
+            self.card_displays.append(card_display)
     
     # def _show_scrollbar(self):
     #     """显示滚动条"""
@@ -1183,24 +1117,19 @@ class DexPage:
         #     # self.ui_manager.process_events([])  # 强制处理清理事件
         
         # 清理卡牌显示组件
-        # for card_display in self.card_displays:
-        #     if hasattr(card_display, '_cached_surface') and card_display._cached_surface:
-        #         try:
-        #             del card_display._cached_surface
-        #         except:
-        #             pass
+        for card_display in self.card_displays:
+            if hasattr(card_display, '_cached_surface') and card_display._cached_surface:
+                try:
+                    del card_display._cached_surface
+                except:
+                    pass
         
         self.card_displays = []
         self.filtered_cards = []
         # self.all_cards = []
         
-        print("✅ DexPage资源清理完成（保留缓存）")
+        print("✅ DexPage资源清理完成")
     
-    def force_cleanup(self):
-        """强制清理所有缓存（游戏退出时调用）"""
-        self._card_displays_pool.clear()
-        self.cleanup()
-
     def __del__(self):
         """析构函数"""
         self.cleanup()

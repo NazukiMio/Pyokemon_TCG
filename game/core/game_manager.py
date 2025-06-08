@@ -6,9 +6,14 @@
 import random
 import time
 import datetime
+import pygame
+import pygame.image
+import os
+from datetime import datetime
 from typing import Dict, List, Optional, Any, Tuple
 from game.core.database.database_manager import DatabaseManager
 from game.core.cards.collection_manager import CardManager
+from game.core.battle.battle_manager import BattleManager
 from game.core.cards.card_data import Card
 
 class GameManager:
@@ -34,6 +39,14 @@ class GameManager:
             print(f"❌ 游戏管理器初始化失败: {e}")
             return False
         
+        # 🆕 添加game_manager引用，用于缓存系统
+        self.card_manager.game_manager = self
+        print(f"✅ CardManager已关联GameManager，缓存系统启用")
+        
+        # 🆕 验证设置是否成功
+        print(f"🔍 GameManager中的CardManager有game_manager: {hasattr(self.card_manager, 'game_manager')}")
+        print(f"🔍 GameManager中的CardManager.game_manager类型: {type(getattr(self.card_manager, 'game_manager', None))}")
+
         # 当前用户ID（可以通过登录设置）
         self.current_user_id = 1
         
@@ -72,7 +85,145 @@ class GameManager:
         }
         
         print("✅ GameManager 初始化完成")
+
+        # # 添加缓存系统
+        # self._card_cache = {
+        #     'all_cards': None,
+        #     'version': 0,
+        #     'last_update': None
+        # }
+        # self._image_cache = {}  # 图片缓存
+        # print(f"🔄 初始化卡牌缓存系统，版本: {self._card_cache['version']}")
+        # print(f"图片缓存系统已初始化，当前缓存大小: {len(self._image_cache)}")
+
+        # 添加缓存系统
+        self._card_cache = {
+            'all_cards': None,
+            'version': 0,
+            'last_update': None
+        }
+        self._image_cache = {}  # 图片缓存
+
+        # 🆕 检查是否需要加载卡牌缓存
+        self._check_and_load_card_cache()
+
+        self.battle_manager = None
+        print("✅ GameManager 战斗系统准备就绪")
+
+        print(f"图片缓存系统已初始化，当前缓存大小: {len(self._image_cache)}")
+
+    def _check_and_load_card_cache(self):
+        """检查并加载卡牌缓存（带持久化版本检查）"""
+        cache_info_file = "cache_info.txt"
+        
+        # 读取持久化的缓存信息
+        try:
+            with open(cache_info_file, 'r') as f:
+                lines = f.read().strip().split('\n')
+                last_cache_time = float(lines[0])
+                last_cache_version = int(lines[1]) if len(lines) > 1 else 1
+        except (OSError, ValueError, IndexError):
+            last_cache_time = 0
+            last_cache_version = 0
+        
+        # 获取cards.json的修改时间
+        try:
+            cards_mtime = os.path.getmtime("card_assets/cards.json")
+        except OSError:
+            cards_mtime = 0
+        
+        # 检查是否需要更新
+        if cards_mtime > last_cache_time + 1:  # +1秒容错
+            print(f"🔄 检测到卡牌库文件更新，需要重新加载缓存...")
+            print(f"   📅 cards.json修改时间: {datetime.fromtimestamp(cards_mtime) if cards_mtime > 0 else '未知'}")
+            print(f"   📅 上次缓存时间: {datetime.fromtimestamp(last_cache_time) if last_cache_time > 0 else '从未缓存'}")
+            
+            # 🆕 关键修改：只清空缓存数据，不重置版本号
+            self._card_cache['all_cards'] = None
+            self._card_cache['version'] = last_cache_version  # 保持版本号连续性
+            self._card_cache['last_update'] = None
+            self._pending_cache_time = cards_mtime
+        else:
+            print(f"✅ 卡牌库无变化，使用缓存版本 v{last_cache_version}")
+            # 🆕 关键修改：恢复完整的缓存状态，包括缓存数据
+            self._card_cache['version'] = last_cache_version
+            self._card_cache['last_update'] = last_cache_time
+            self._card_cache['all_cards'] = "CACHED"  # 🆕 标记为已缓存，避免重新加载
+            self._pending_cache_time = None
+
+    def get_cached_cards(self):
+        """获取缓存的卡牌数据"""
+        # 🆕 检查是否已经有有效缓存
+        if self._card_cache['all_cards'] == "CACHED":
+            # 从数据库重新加载（这比从cards.json加载快很多）
+            print("📦 从数据库快速加载卡牌数据...")
+            cards = self.card_manager.search_cards(limit=10000)
+            self._card_cache['all_cards'] = cards
+            print(f"✅ 快速加载完成: {len(cards)} 张卡牌")
+            return cards
+        elif self._card_cache['all_cards'] is None:
+            # 需要完整加载
+            self._load_cards_to_cache()
+        
+        return self._card_cache['all_cards']
     
+    def _load_cards_to_cache(self):
+        """加载卡牌到缓存"""
+        print("🔄 正在加载卡牌到缓存...")
+        cards = self.card_manager.search_cards(limit=10000)
+        self._card_cache['all_cards'] = cards
+        self._card_cache['version'] += 1  # 版本号递增
+        self._card_cache['last_update'] = time.time()
+        
+        # 🆕 保存缓存信息到文件
+        try:
+            cache_info_file = "cache_info.txt"
+            with open(cache_info_file, 'w') as f:
+                # 使用实际的文件修改时间，而不是当前时间
+                cache_time = getattr(self, '_pending_cache_time', None) or time.time()
+                f.write(f"{cache_time}\n{self._card_cache['version']}")
+            print(f"💾 缓存信息已保存 (版本: v{self._card_cache['version']})")
+        except OSError as e:
+            print(f"⚠️ 无法保存缓存信息: {e}")
+        
+        print(f"✅ 卡牌缓存完成: {len(cards)} 张卡牌")
+    
+    def get_card_cache_version(self):
+        """获取缓存版本号"""
+        return self._card_cache['version']
+    
+    def invalidate_card_cache(self):
+        """清理卡牌缓存（卡牌库更新时调用）"""
+        print("🗑️ 清理卡牌缓存...")
+        self._card_cache['all_cards'] = None
+        self._image_cache.clear()
+        
+    def get_cached_image(self, image_path):
+        """获取缓存的图片"""
+        # print(f"📸 get_cached_image被调用: {image_path}")
+        
+        # 确保pygame已初始化
+        if not pygame.get_init():
+            print("⚠️ pygame未初始化，跳过图片缓存")
+            return None
+            
+        if image_path not in self._image_cache:
+            # print(f"🔄 首次加载图片到缓存: {image_path}")
+            if os.path.exists(image_path):
+                try:
+                    self._image_cache[image_path] = pygame.image.load(image_path)
+                    # print(f"✅ 图片缓存成功: {image_path}")
+                except Exception as e:
+                    print(f"❌ 加载图片失败 {image_path}: {e}")
+                    return None
+            else:
+                print(f"❌ 图片文件不存在: {image_path}")
+                return None
+        else:
+            print(f"📦 从缓存获取图片: {image_path}")
+        
+        return self._image_cache[image_path]
+
     def _ensure_default_user(self):
         """确保默认用户存在"""
         user = self.db_manager.get_user_info(self.current_user_id)
@@ -199,17 +350,63 @@ class GameManager:
         success, cards, message = self.open_pack(pack_id)
         
         if success:
-            # 转换卡牌数据格式，适配PackOpeningWindow期望的格式
             cards_data = []
-            for card in cards:
-                cards_data.append({
+            print(f"🖼️ 检查卡牌图片路径:")
+            
+            for i, card in enumerate(cards):
+                # 🔑 使用CardManager的get_card_image_path方法（与图鉴页面一致）
+                print(f"  卡牌{i+1}: {card.name}")
+                print(f"    ID: '{card.id}'")
+                print(f"    数据库原始image_path: '{getattr(card, 'image_path', 'None')}'")
+                
+                # 🔑 使用CardManager的get_card_image_path方法处理路径
+                processed_image_path = self.card_manager.get_card_image_path(card.id)
+                print(f"    CardManager处理后路径: '{processed_image_path}'")
+                
+                # ✅ 手动验证和修正路径（双重保险）
+                final_image_path = processed_image_path
+                if processed_image_path:
+                    import os
+                    if os.path.exists(processed_image_path):
+                        print(f"    ✅ 图片文件存在: {processed_image_path}")
+                        final_image_path = processed_image_path
+                    else:
+                        print(f"    ❌ 处理后的路径不存在，尝试手动修正...")
+                        # 手动修正路径
+                        raw_path = getattr(card, 'image_path', '')
+                        if raw_path:
+                            # ✅ 保持Windows路径格式，只添加card_assets前缀
+                            corrected_path = raw_path
+                            # 添加card_assets前缀（使用os.path.join确保路径正确）
+                            if not (corrected_path.startswith('card_assets') or corrected_path.startswith('card_assets\\')):
+                                corrected_path = os.path.join('card_assets', corrected_path)
+                            
+                            print(f"    手动修正路径: '{corrected_path}'")
+                            if os.path.exists(corrected_path):
+                                print(f"    ✅ 手动修正成功: {corrected_path}")
+                                final_image_path = corrected_path
+                            else:
+                                print(f"    ❌ 手动修正也失败: {corrected_path}")
+                                final_image_path = None
+                else:
+                    print(f"    ❌ CardManager返回空路径")
+                    final_image_path = None
+
+                card_data = {
                     "id": card.id,
                     "name": card.name,
                     "rarity": card.rarity,
-                    "image": getattr(card, 'image_path', ''),  # ✅ 使用image_path字段
+                    "image": final_image_path,  # ✅ 使用CardManager处理后的路径
                     "hp": getattr(card, 'hp', None),
-                    "types": card.types if hasattr(card, 'types') else []  # ✅ 更安全的类型获取
-                })
+                    "types": card.types if hasattr(card, 'types') else []
+                }
+
+                print(f"    最终传递给界面的image: '{card_data['image']}'")
+                cards_data.append(card_data)
+
+            print(f"🎮 传给PackOpeningWindow的数据:")
+            print(f"  success: {True}")
+            print(f"  cards数量: {len(cards_data)}")
             
             return {
                 "success": True,
@@ -378,7 +575,7 @@ class GameManager:
     def get_user_collection_stats(self) -> Dict[str, Any]:
         """获取用户收藏统计"""
         user_cards = self.get_user_cards()
-        user_card_ids = [card_info['card']['id'] for card_info in user_cards]
+        user_card_ids = [card_info['card'].id for card_info in user_cards]
         
         # 使用卡牌管理器获取收藏进度
         collection_progress = self.card_manager.get_collection_progress(user_card_ids)
@@ -548,6 +745,78 @@ class GameManager:
         
         print("✅ 测试数据生成完成")
     
+    # ==================== 战斗系统 ====================
+    def create_battle_manager(self, player_deck_id, opponent_type="AI", opponent_id=None):
+        """创建战斗管理器"""
+        try:
+            self.battle_manager = BattleManager(
+                game_manager=self,
+                player_id=self.current_user_id,
+                player_deck_id=player_deck_id,
+                opponent_type=opponent_type,
+                opponent_id=opponent_id
+            )
+            return True, "战斗管理器创建成功"
+        except Exception as e:
+            print(f"创建战斗管理器失败: {e}")
+            return False, str(e)
+
+    def get_battle_manager(self):
+        """获取当前战斗管理器"""
+        return self.battle_manager
+
+    def end_current_battle(self):
+        """结束当前战斗"""
+        if self.battle_manager:
+            self.battle_manager.cleanup()
+            self.battle_manager = None
+
+    def get_user_battle_stats(self):
+        """获取用户战斗统计"""
+        try:
+            battles = self.db_manager.get_user_battles(self.current_user_id, limit=1000)
+            
+            total_battles = len(battles)
+            pve_wins = sum(1 for b in battles if b['battle_type'] == 'PVE' and b['winner_id'] == self.current_user_id)
+            pvp_wins = sum(1 for b in battles if b['battle_type'] == 'PVP' and b['winner_id'] == self.current_user_id)
+            
+            return {
+                'total_battles': total_battles,
+                'pve_battles': len([b for b in battles if b['battle_type'] == 'PVE']),
+                'pvp_battles': len([b for b in battles if b['battle_type'] == 'PVP']),
+                'pve_wins': pve_wins,
+                'pvp_wins': pvp_wins,
+                'total_wins': pve_wins + pvp_wins,
+                'win_rate': round((pve_wins + pvp_wins) / total_battles * 100, 2) if total_battles > 0 else 0
+            }
+        except Exception as e:
+            print(f"获取战斗统计失败: {e}")
+            return {}
+
+    def validate_deck_for_battle(self, deck_id):
+        """验证卡组是否适合战斗"""
+        try:
+            deck_cards = self.get_deck_cards(deck_id)
+            if not deck_cards:
+                return False, "卡组为空"
+            
+            if len(deck_cards) < 20:
+                return False, f"卡组至少需要20张卡牌，当前只有{len(deck_cards)}张"
+            
+            # 检查是否有Pokemon
+            pokemon_count = 0
+            for card_data in deck_cards:
+                card = self.get_card_by_id(card_data['card_id'])
+                if card and card.hp:  # 有HP的卡牌是Pokemon
+                    pokemon_count += card_data['quantity']
+            
+            if pokemon_count < 5:
+                return False, "卡组至少需要5只Pokemon"
+            
+            return True, "卡组验证通过"
+        except Exception as e:
+            return False, f"卡组验证失败: {str(e)}"
+
     def reset_user_data(self):
         """重置用户数据（开发用）"""
         print("🔄 重置用户数据...")
@@ -576,6 +845,11 @@ class GameManager:
     
     def cleanup(self):
         """清理资源"""
+        # 清理战斗管理器
+        if self.battle_manager:
+            self.battle_manager.cleanup()
+            self.battle_manager = None
+
         if self.db_manager:
             self.db_manager.close()
         print("🧹 GameManager 资源清理完成")

@@ -268,7 +268,8 @@ class MainScene:
                         self.screen_width, 
                         self.screen_height, 
                         self.ui_manager, 
-                        self.card_manager,
+                        self.game_manager.card_manager,
+                        self.game_manager,
                         self.nav_bar.height
                     )
                 # else:
@@ -460,6 +461,13 @@ class MainScene:
 
         # 主页事件处理（仅在主页时）
         if self.current_page == 'home':
+            # 如果开包窗口显示，优先处理其事件
+            if (self.home_page.active_windows.get('pack_opening') and 
+                self.home_page.active_windows['pack_opening'].is_visible):
+                pack_result = self.home_page.active_windows['pack_opening'].handle_event(event)
+                if pack_result:
+                    return True  # 阻止进一步的事件处理
+                
             # pygame_gui事件处理（包括窗口事件）
             ui_result = self.home_page.handle_ui_event(event)
             
@@ -535,6 +543,15 @@ class MainScene:
         # 绘制统一的渐变背景
         gradient_bg = self.create_gradient_background()
         self.screen.blit(gradient_bg, (0, 0))
+
+        # 绘制统一的渐变背景
+        gradient_bg = self.create_gradient_background()
+        self.screen.blit(gradient_bg, (0, 0))
+        
+        # 检查是否有开包窗口显示
+        pack_window_visible = (self.current_page == 'home' and 
+                            self.home_page.active_windows.get('pack_opening') and 
+                            self.home_page.active_windows['pack_opening'].is_visible)
         
         # 根据当前页面绘制内容
         if self.current_page == 'home':
@@ -554,8 +571,12 @@ class MainScene:
             page_name = page_names.get(self.current_page, self.current_page)
             self.draw_page_placeholder(page_name)
         
-        # 绘制导航栏（始终在最上层）
-        self.nav_bar.draw(self.screen)
+        # # 绘制导航栏（始终在最上层）
+        # self.nav_bar.draw(self.screen)
+        # 绘制导航栏（只有在没有开包窗口时）
+        if not pack_window_visible:
+            self.nav_bar.draw(self.screen)
+        
         
         # 绘制消息
         self.message_manager.draw(self.screen, self.scale_factor)
@@ -583,7 +604,10 @@ class MainScene:
                         element.hide()
 
         # 绘制pygame-gui界面
-        self.ui_manager.draw_ui(self.screen)
+        # self.ui_manager.draw_ui(self.screen)
+        # 绘制pygame-gui界面（只有在没有开包窗口时）
+        if not pack_window_visible:
+            self.ui_manager.draw_ui(self.screen)
     
     def cleanup(self):
         """清理资源"""
@@ -595,8 +619,8 @@ class MainScene:
         # if hasattr(self.dex_page, 'cleanup'):
         #     self.dex_page.cleanup()
             
-        if self.dex_page:
-            self.dex_page.hide_ui_elements()
+        # if self.dex_page:
+        #     self.dex_page.hide_ui_elements()
         
         if hasattr(self.nav_bar, 'cleanup'):
             self.nav_bar.cleanup()
