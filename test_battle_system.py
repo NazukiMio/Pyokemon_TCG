@@ -19,7 +19,7 @@ def test_battle_system():
     pygame.init()
     
     # 设置窗口
-    screen_size = (1200, 800)
+    screen_size = (1280, 720)
     screen = pygame.display.set_mode(screen_size)
     pygame.display.set_caption("Pokemon TCG - 战斗系统测试")
     

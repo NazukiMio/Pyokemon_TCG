@@ -1,17 +1,14 @@
 project_root/
-├── assets/                                         # 资源文件，如图片、音频等
 ├── README.md
 ├── cache_info.txt
 ├── cache_version.txt
 ├── card_assets/
-│   ├── images/                                     # 卡片图片
 │   └── cards.json
 ├── config/
 │   └── __init__.py
 ├── data/
 │   ├── backup/
-│   ├── game_database.db
-│   └── game_database.db.disable
+│   └── game_database.db
 ├── docs/
 ├── game/
 │   ├── __init__.py
@@ -25,17 +22,15 @@ project_root/
 │   │   │   ├── ai_opponent.py
 │   │   │   ├── battle_actions.py
 │   │   │   ├── battle_controller.py
-│   │   │   ├── battle_controller1Edited.py
-│   │   │   ├── battle_controllerOriginal.py
 │   │   │   ├── battle_manager.py
 │   │   │   ├── battle_rules.py
 │   │   │   ├── battle_state.py
 │   │   │   ├── player_state.py
 │   │   │   ├── pokemon_instance.py
+│   │   │   ├── synchronized_battle_controller.py
 │   │   │   └── test_battle.py
 │   │   ├── cards/
 │   │   │   ├── card_data.py
-│   │   │   ├── card_manager.py.disabled
 │   │   │   └── collection_manager.py
 │   │   ├── database/
 │   │   │   ├── __init__.py
@@ -54,7 +49,6 @@ project_root/
 │   │   │   ├── __init__.py
 │   │   │   ├── animation_manager.py
 │   │   │   └── transitions.py
-│   │   ├── battle_page copy.py
 │   │   ├── battle_page.py
 │   │   ├── components/
 │   │   │   ├── __init__.py
@@ -62,21 +56,16 @@ project_root/
 │   │   │   ├── input_component.py
 │   │   │   └── message_component.py
 │   │   ├── dex_page.py
-│   │   ├── dex_page.py.backup
-│   │   ├── dex_test_launch.py
 │   │   ├── home_page.py
 │   │   ├── login_scene.py
-│   │   ├── login_scene.py.backup
 │   │   ├── main_scene.py
 │   │   ├── register_scene.py
-│   │   ├── register_scene.py.backup
 │   │   ├── styles/
 │   │   │   ├── __init__.py
 │   │   │   ├── dex_theme.json
 │   │   │   ├── fonts.py
 │   │   │   └── theme.py
 │   │   ├── welcome_scene.py
-│   │   ├── welcome_scene.py.backup
 │   │   └── windows/
 │   │       ├── __init__.py
 │   │       ├── battle/
@@ -101,40 +90,31 @@ project_root/
 │   │       │   ├── __init__.py
 │   │       │   ├── pack_opening_window.py
 │   │       │   └── test_pack_window.py
-│   │       ├── package.py
-│   │       ├── tienda/
-│   │       │   ├── __init__.py
-│   │       │   ├── testtienda.py
-│   │       │   ├── themed_window.py
-│   │       │   ├── tienda_draw.py
-│   │       │   ├── tienda_draw.py.backup
-│   │       │   ├── tienda_modern.py
-│   │       │   ├── tienda_modern.py.backup
-│   │       │   └── tienda_theme.json
-│   │       └── tienda.py
+│   │       └── tienda/
+│   │           ├── __init__.py
+│   │           ├── testtienda.py
+│   │           ├── themed_window.py
+│   │           ├── tienda_draw.py
+│   │           ├── tienda_draw.py.backup
+│   │           ├── tienda_modern.py
+│   │           ├── tienda_modern.py.backup
+│   │           └── tienda_theme.json
 │   ├── ui/
 │   │   ├── __init__.py
+│   │   ├── battle/
+│   │   │   ├── __init__.py
+│   │   │   └── battle_interface/
+│   │   │       ├── __init__.py
+│   │   │       ├── battle_cache.py
+│   │   │       ├── battle_interface.py
+│   │   │       ├── new_battle_interface.py
+│   │   │       └── pokemon_card_adapter.py
 │   │   └── navigation_bar/
 │   │       ├── __init__.py
-│   │       ├── navigation_bar.py
-│   │       ├── navigation_bar_gui.py
 │   │       └── pokemon_navigation_bar.py
 │   └── utils/
 │       ├── __init__.py
 │       ├── load_font.py
 │       └── video_background.py
 ├── main.py
-├── requirements.txt
-├── scripts/
-│   ├── build.py
-│   └── deploy.py
-├── test_battle_system.py
-├── test_theme.json
-└── tests/
-    ├── __init__.py
-    ├── card_viewer.py
-    ├── fixtures/
-    ├── test_auth.py
-    ├── test_database.py
-    ├── test_gui.py
-    └── test_scenes.py
+└── requirements.txt

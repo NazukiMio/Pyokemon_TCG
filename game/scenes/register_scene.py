@@ -245,7 +245,7 @@ class RegisterScene:
             if os.path.exists(logo_path):
                 self.subtitle_logo = pygame.image.load(logo_path)
                 # 调整副标题Logo大小
-                logo_width = int(self.screen.get_width() * 0.4)
+                logo_width = int(self.screen.get_width() * 0.2)
                 logo_height = int(logo_width * (self.subtitle_logo.get_height() / self.subtitle_logo.get_width()))
                 self.subtitle_logo = pygame.transform.smoothscale(self.subtitle_logo, (logo_width, logo_height))
                 print("✅ 副标题Logo加载成功")

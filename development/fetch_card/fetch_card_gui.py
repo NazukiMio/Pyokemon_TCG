@@ -7,10 +7,10 @@ from tkinter import ttk, messagebox, filedialog
 from tqdm import tqdm
 import threading
 
-# 默认输出目录
+# Directorio de salida predeterminado
 DEFAULT_OUTPUT_DIR = "card_assets"
 
-# 稀有度比例配置（可根据需要调整）
+# Distribución de rarezas (ajustable)
 RARITY_DISTRIBUTION = {
     "Common": 0.35,
     "Uncommon": 0.25,
@@ -33,7 +33,7 @@ RARITY_DISTRIBUTION = {
 API_URL = "https://api.pokemontcg.io/v2/cards"
 HEADERS = {}
 
-# 爬取与保存逻辑
+# Lógica de descarga y guardado
 def fetch_and_save_cards(total_cards, output_dir, clear_images, log_callback):
     image_dir = os.path.join(output_dir, "images")
     os.makedirs(image_dir, exist_ok=True)
@@ -41,12 +41,12 @@ def fetch_and_save_cards(total_cards, output_dir, clear_images, log_callback):
     if clear_images:
         shutil.rmtree(image_dir)
         os.makedirs(image_dir, exist_ok=True)
-        log_callback("🧹 已清除旧图片文件夹内容")
+        log_callback("🧹 Se ha limpiado el contenido de la carpeta de imágenes")
 
     all_cards = []
     for rarity, ratio in RARITY_DISTRIBUTION.items():
         count = max(1, int(round(total_cards * ratio)))
-        log_callback(f"📦 正在获取 {rarity}（目标 {count} 张）")
+        log_callback(f"📦 Obteniendo {rarity} (objetivo {count} cartas)")
         rarity_cards = []
         page = 1
         while len(rarity_cards) < count:
@@ -55,7 +55,7 @@ def fetch_and_save_cards(total_cards, output_dir, clear_images, log_callback):
                 response = requests.get(API_URL, headers=HEADERS, params=params)
                 data = response.json().get("data", [])
             except Exception as e:
-                log_callback(f"❌ 请求失败：{e}")
+                log_callback(f"❌ Error en la solicitud: {e}")
                 break
 
             if not data:
@@ -68,10 +68,10 @@ def fetch_and_save_cards(total_cards, output_dir, clear_images, log_callback):
                 rarity_cards.append(card)
             page += 1
         all_cards.extend(rarity_cards)
-        log_callback(f"✅ 已获取 {len(rarity_cards)} 张 {rarity}")
+        log_callback(f"✅ Obtenidas {len(rarity_cards)} cartas de rareza {rarity}")
 
-    # 下载图像
-    for card in tqdm(all_cards, desc="⬇️ 下载图片"):
+    # Descargar imágenes
+    for card in tqdm(all_cards, desc="⬇️ Descargando imágenes"):
         image_url = card.get("images", {}).get("small")
         if not image_url:
             continue
@@ -82,9 +82,9 @@ def fetch_and_save_cards(total_cards, output_dir, clear_images, log_callback):
                 f.write(img_data)
             card["image"] = os.path.relpath(image_path, output_dir)
         except Exception as e:
-            log_callback(f"[错误] 下载失败 {card['id']}: {e}")
+            log_callback(f"[Error] Fallo al descargar {card['id']}: {e}")
 
-    # 保存 JSON
+    # Guardar JSON
     simplified = []
     for card in all_cards:
         simplified.append({
@@ -92,7 +92,7 @@ def fetch_and_save_cards(total_cards, output_dir, clear_images, log_callback):
             "name": card.get("name", ""),
             "hp": int(card.get("hp", "0")) if card.get("hp", "0").isdigit() else 0,
             "types": card.get("types", []),
-            "rarity": card.get("rarity", "Unknown"),
+            "rarity": card.get("rarity", "Desconocido"),
             "attacks": [{
                 "name": atk.get("name", ""),
                 "damage": atk.get("damage", ""),
@@ -104,9 +104,9 @@ def fetch_and_save_cards(total_cards, output_dir, clear_images, log_callback):
     with open(json_path, "w", encoding="utf-8") as f:
         json.dump(simplified, f, indent=2, ensure_ascii=False)
 
-    log_callback(f"🎉 完成：共保存 {len(simplified)} 张卡牌到 {json_path}")
+    log_callback(f"🎉 ¡Hecho! Se han guardado {len(simplified)} cartas en {json_path}")
 
-# GUI 构建
+# Interfaz gráfica
 def launch_gui():
     def update_clear_checkbox_state(*_):
         img_dir = os.path.join(dir_var.get(), "images")
@@ -128,14 +128,14 @@ def launch_gui():
             if total <= 0:
                 raise ValueError
         except ValueError:
-            messagebox.showerror("错误", "请输入合法的卡牌数量（正整数）")
+            messagebox.showerror("Error", "Por favor, introduce un número válido de cartas (entero positivo)")
             return
 
         raw_dir = dir_var.get().strip()
         out_dir = raw_dir if raw_dir and all(c not in raw_dir for c in '<>:"|?*') else DEFAULT_OUTPUT_DIR
         os.makedirs(out_dir, exist_ok=True)
 
-        text_area.insert(tk.END, f"🚀 开始爬取，目标卡牌数：{total}，输出目录：{out_dir}\n")
+        text_area.insert(tk.END, f"🚀 Iniciando descarga, objetivo: {total} cartas, directorio de salida: {out_dir}\n")
         text_area.see(tk.END)
 
         def log_callback(msg):
@@ -151,26 +151,26 @@ def launch_gui():
         ), daemon=True).start()
 
     root = tk.Tk()
-    root.title("卡池构建工具")
+    root.title("Herramienta de Generación de Pool de Cartas")
 
     frm = ttk.Frame(root, padding=12)
     frm.grid()
 
-    ttk.Label(frm, text="🎴 目标卡牌数量:").grid(column=0, row=0, sticky="w")
+    ttk.Label(frm, text="🎴 Número de cartas objetivo:").grid(column=0, row=0, sticky="w")
     entry_var = tk.StringVar(value="500")
     ttk.Entry(frm, width=10, textvariable=entry_var).grid(column=1, row=0, sticky="w")
 
-    ttk.Label(frm, text="📁 输出目录（可选）:").grid(column=0, row=1, sticky="w")
+    ttk.Label(frm, text="📁 Directorio de salida (opcional):").grid(column=0, row=1, sticky="w")
     dir_var = tk.StringVar(value=DEFAULT_OUTPUT_DIR)
     ttk.Entry(frm, width=30, textvariable=dir_var).grid(column=1, row=1, sticky="w")
-    ttk.Button(frm, text="选择...", command=choose_directory).grid(column=2, row=1, padx=5)
+    ttk.Button(frm, text="Elegir...", command=choose_directory).grid(column=2, row=1, padx=5)
 
     clear_var = tk.BooleanVar()
-    clear_check = ttk.Checkbutton(frm, text="🧹 清空已有图像", variable=clear_var)
+    clear_check = ttk.Checkbutton(frm, text="🧹 Borrar imágenes existentes", variable=clear_var)
     clear_check.grid(column=1, row=2, sticky="w")
     update_clear_checkbox_state()
 
-    ttk.Button(frm, text="开始构建卡池", command=start_download).grid(column=1, row=3, pady=10)
+    ttk.Button(frm, text="Iniciar generación", command=start_download).grid(column=1, row=3, pady=10)
 
     text_area = tk.Text(frm, width=70, height=20)
     text_area.grid(column=0, row=4, columnspan=3, pady=5)

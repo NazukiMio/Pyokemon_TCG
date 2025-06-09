@@ -148,7 +148,7 @@ class BattlePage:
         
         try:
             # 加载Logo (可以是Pokemon风格的Logo)
-            logo_path = os.path.join("assets", "images", "battle_logo.png")
+            logo_path = os.path.join("assets", "images", "logo", "game_logo.png")
             if os.path.exists(logo_path):
                 self.logo_image = pygame.image.load(logo_path)
                 self.logo_image = pygame.transform.scale(
@@ -161,7 +161,7 @@ class BattlePage:
                 self.logo_image = None
             
             # 加载装饰背景图片
-            decoration_path = os.path.join("assets", "images", "battle_decoration.png")
+            decoration_path = os.path.join("assets", "images", "backgrounds", "battle_deco.jpg")
             if os.path.exists(decoration_path):
                 self.decoration_image = pygame.image.load(decoration_path)
                 self.decoration_image = pygame.transform.scale(
@@ -366,6 +366,14 @@ class BattlePage:
         print(f"🎮 [battle_page.py] 战斗开始回调触发: {battle_id}")
         
         try:
+            # ✅ 销毁按钮，避免UI重叠
+            if self.deck_builder_button:
+                self.deck_builder_button.kill()
+                self.deck_builder_button = None
+            if self.battle_prep_button:
+                self.battle_prep_button.kill()
+                self.battle_prep_button = None
+            
             # 🆕 立即显示战斗界面
             self._show_battle_interface(battle_id)
             
@@ -443,7 +451,7 @@ class BattlePage:
             BattleInterface = None
             
             import_attempts = [
-                "game.scenes.windows.battle.battle_interface.battle_ui",
+                "game.ui.battle.battle_interface.new_battle_interface",
                 "game.ui.battle.battle_interface.battle_ui",
                 "ui.battle.battle_interface.battle_ui", 
                 "battle_interface.battle_ui",
@@ -458,9 +466,11 @@ class BattlePage:
                     BattleInterface = getattr(module, 'BattleInterface', None)
                     if BattleInterface:
                         print(f"✅ 成功导入 BattleInterface from {import_path}")
+                        print("✅ 战斗界面创建成功，没有异常")
                         break
                 except Exception as e:
                     print(f"❌ 导入失败 {import_path}: {e}")
+                    print(f"❌ 战斗界面创建时发生异常: {e}")
                     continue
             
             # 🆕 如果导入失败，使用内置简化版本

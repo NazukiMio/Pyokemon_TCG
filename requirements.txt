@@ -1,14 +1,15 @@
-# 核心依赖
-# pygame>=2.0.0
-pygame-gui
+pygame
+pygame_gui
+pygamecards
+# Existe un conflicto de dependencias; es necesario seguir estrictamente el orden de instalación indicado en el archivo README.md.
 
-# 可选依赖（视频背景支持）
+requests
+pillow
 opencv-python
+tqdm
+graphviz
 
-# 开发依赖
-pytest
-black
-flake8
+flask
+flask-socketio
+eventlet
 
-# 文档生成
-sphinx
