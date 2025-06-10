@@ -14,7 +14,7 @@ from game.scenes.login_scene import LoginScene
 from game.scenes.register_scene import RegisterScene
 from game.scenes.main_scene import MainScene
 from game.scenes.styles.theme import Theme
-from game.scenes.styles.fonts import font_manager
+from game.scenes.styles import fonts
 
 class GameLauncher:
     """游戏启动器，统一的入口点"""
@@ -28,6 +28,9 @@ class GameLauncher:
         # 初始化pygame
         self.init_pygame()
         
+        # 初始化字体
+        fonts.font_manager = fonts.FontManager()
+
         # 设置窗口
         self.setup_window()
         

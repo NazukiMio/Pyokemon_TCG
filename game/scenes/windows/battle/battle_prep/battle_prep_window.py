@@ -61,6 +61,15 @@ class BattlePrepWindow(pygame_gui.elements.UIWindow):
         print(f"   battle_controller: {battle_controller is not None}")
         print(f"   battle_controller类型: {type(battle_controller)}")
 
+        self.battle_start_callback = None
+        
+        # 检查控制器能力
+        capabilities = self.check_controller_capability()
+        if capabilities.get("sync"):
+            print("✅ [battle_prep_window.py] 检测到同步战斗控制器")
+        else:
+            print("⚠️ [battle_prep_window.py] 使用普通战斗控制器")
+
         # 如果battle_controller为None，尝试创建
         if self.battle_controller is None:
             print("⚠️ [battle_prep_window.py] battle_controller为None，尝试创建")
@@ -513,83 +522,140 @@ class BattlePrepWindow(pygame_gui.elements.UIWindow):
         except Exception as e:
             print(f"❌ [battle_prep_window.py] 获取预置卡组卡牌失败: {e}")
             return []
+        
     def _start_pve_battle(self):
-        """开始PVE对战"""
+        """启动PVE对战 - 同步版本"""
+        print("🚀 [battle_prep_window.py] 开始PVE对战准备（同步版本）")
+        
         try:
-            print(f"🚀 [battle_prep_window.py] 开始PVE对战准备")
-            
-            # 检查battle_controller
-            if self.battle_controller is None:
-                print("❌ [battle_prep_window.py] battle_controller为None")
+            # 验证battle_controller
+            if not self.battle_controller:
+                print("❌ [battle_prep_window.py] battle_controller为空")
+                self._show_error("战斗控制器未初始化")
                 return
             
             print(f"✅ [battle_prep_window.py] battle_controller验证: {type(self.battle_controller)}")
             
-            # 获取AI难度
-            ai_opponent_key = self.selected_ai_difficulty or 'rookie_trainer'
-            print(f"🤖 [battle_prep_window.py] 选择AI对手: {ai_opponent_key}")
+            # 获取AI对手
+            # ai_difficulty_index = self.AI_OPPONENT_OPTIONS
+            # ai_difficulties = ["rookie_trainer", "gym_leader", "elite_four", "champion"]
             
-            # 准备卡组ID
+            # if 0 <= ai_difficulty_index < len(ai_difficulties):
+            #     opponent_difficulty = ai_difficulties[ai_difficulty_index]
+            # else:
+            #     opponent_difficulty = "rookie_trainer"
+
+            # 获取AI对手
+            opponent_difficulty = self.selected_ai_difficulty or "rookie_trainer"
+            
+            print(f"🤖 [battle_prep_window.py] 选择AI对手: {opponent_difficulty}")
+            
+            # 获取卡组
             deck_id = None
             
-            if self.selected_deck_type == "preset":
-                print(f"🔍 [battle_prep_window.py] 使用预置卡组")
-                deck_id = self._create_preset_deck()
-                if not deck_id:
-                    print("❌ [battle_prep_window.py] 创建预置卡组失败")
+            if hasattr(self, 'use_user_deck') and self.use_user_deck:
+                print(f"🔍 [battle_prep_window.py] 使用用户卡组")
+                user_decks = self.game_manager.get_user_decks()
+                if user_decks:
+                    deck_id = user_decks[0]['id']
+                    
+                    # 验证卡组
+                    deck_cards = self.game_manager.get_deck_cards(deck_id)
+                    print(f"📦 [battle_prep_window.py] 用户卡组验证:")
+                    print(f"   卡组ID: {deck_id}")
+                    print(f"   已获取卡牌数量: {len(deck_cards) if deck_cards else 0}")
+                    
+                    if not deck_cards or len(deck_cards) < 20:
+                        self._show_error(f"卡组卡牌数量不足（需要20张，当前{len(deck_cards) if deck_cards else 0}张）")
+                        return
+                else:
+                    self._show_error("没有可用的用户卡组")
                     return
             else:
-                print(f"🔍 [battle_prep_window.py] 使用用户卡组")
-                deck_id = self.selected_deck_id
-                
-                print(f"📦 [battle_prep_window.py] 用户卡组验证:")
-                print(f"   卡组ID: {deck_id}")
-                print(f"   已获取卡牌数量: {len(self.selected_deck_cards) if self.selected_deck_cards else 0}")
-            
-            if not deck_id:
-                print("❌ [battle_prep_window.py] 卡组ID无效")
+                # 使用随机卡组（如果实现了这个功能）
+                print(f"🎲 [battle_prep_window.py] 使用随机卡组")
+                self._show_error("随机卡组功能尚未实现，请创建自定义卡组")
                 return
             
-            # 确保deck_id是整数类型（battle_controller.py期望int类型）
-            try:
-                deck_id = int(deck_id)
-            except (ValueError, TypeError):
-                print(f"❌ [battle_prep_window.py] 卡组ID不是有效整数: {deck_id}")
-                return
-                
+            # 准备战斗参数
             print(f"🚀 [battle_prep_window.py] 启动PVE对战参数:")
             print(f"   player_deck_id: {deck_id} (类型: {type(deck_id)})")
             print(f"   opponent_type: AI")
-            print(f"   opponent_difficulty: {ai_opponent_key}")
+            print(f"   opponent_difficulty: {opponent_difficulty}")
             
-            # 调用battle_controller.start_new_battle（完全按照其接口）
-            result = self.battle_controller.start_new_battle(
-                player_deck_id=deck_id,  # int类型
-                opponent_type="AI",      # str类型
-                opponent_difficulty=ai_opponent_key  # str类型
-            )
+            # 根据控制器类型选择启动方法
+            if hasattr(self.battle_controller, 'start_new_battle_synchronized'):
+                # 使用同步启动
+                print(f"🔄 [battle_prep_window.py] 使用同步战斗启动")
+                result = self.battle_controller.start_new_battle_synchronized(
+                    player_deck_id=deck_id,
+                    opponent_type="AI",
+                    opponent_difficulty=opponent_difficulty
+                )
+            else:
+                # 使用普通启动
+                print(f"🔄 [battle_prep_window.py] 使用普通战斗启动")
+                result = self.battle_controller.start_new_battle(
+                    player_deck_id=deck_id,
+                    opponent_type="AI",
+                    opponent_difficulty=opponent_difficulty
+                )
             
             print(f"🔍 [battle_prep_window.py] 战斗启动结果: {result}")
             
             if result.get("success"):
+                battle_id = result.get("battle_id")
+                status = result.get("status", "started")
+                
                 print(f"✅ [battle_prep_window.py] 战斗启动成功")
-                print(f"   battle_id: {result.get('battle_id')}")
-                print(f"   message: {result.get('message')}")
+                print(f"   battle_id: {battle_id}")
+                print(f"   status: {status}")
+                print(f"   message: {result.get('message', '')}")
                 
-                # 关闭窗口并通知父组件
-                if hasattr(self, 'on_battle_start') and self.on_battle_start:
-                    self.on_battle_start(result["battle_id"])
+                # 触发战斗开始回调
+                if self.battle_start_callback:
+                    if status == "prepared":
+                        # 同步模式：传递完整信息
+                        print(f"📡 [battle_prep_window.py] 触发同步战斗开始回调")
+                        self.battle_start_callback({
+                            "battle_id": battle_id,
+                            "status": status,
+                            "message": result.get("message", "")
+                        })
+                    else:
+                        # 普通模式：只传递battle_id
+                        print(f"📡 [battle_prep_window.py] 触发普通战斗开始回调")
+                        self.battle_start_callback(battle_id)
                 
+                # 关闭窗口
                 self.kill()
+                
             else:
-                error_msg = result.get('error', '未知错误')
+                error_msg = result.get("error", "未知错误")
                 print(f"❌ [battle_prep_window.py] 战斗启动失败: {error_msg}")
-                # 可以在这里显示错误消息给用户
+                self._show_error(f"启动战斗失败: {error_msg}")
                 
         except Exception as e:
-            print(f"❌ [battle_prep_window.py] 启动对战时出错: {e}")
+            error_msg = f"启动PVE对战时发生异常: {str(e)}"
+            print(f"❌ [battle_prep_window.py] {error_msg}")
             import traceback
             traceback.print_exc()
+            self._show_error(error_msg)
+
+    def _show_error(self, message: str):
+        """显示错误消息 - 改进版本"""
+        print(f"❌ [battle_prep_window.py] 错误: {message}")
+        
+        try:
+            # 如果有状态标签，更新它
+            if hasattr(self, 'status_label'):
+                self.status_label.set_text(f"错误: {message}")
+            
+            # 也可以显示系统消息框（如果需要）
+            # 这里暂时只打印到控制台
+            
+        except Exception as e:
+            print(f"❌ [battle_prep_window.py] 显示错误消息失败: {e}")
     
     def _create_preset_deck(self) -> Optional[int]:
         """创建预置卡组的临时副本"""
@@ -677,6 +743,35 @@ class BattlePrepWindow(pygame_gui.elements.UIWindow):
         
         return handled
     
+    def check_controller_capability(self):
+        """检查控制器能力"""
+        if not self.battle_controller:
+            return {"sync": False, "error": "控制器不存在"}
+        
+        capabilities = {
+            "sync": hasattr(self.battle_controller, 'start_new_battle_synchronized'),
+            "notify": hasattr(self.battle_controller, 'notify_interface_ready'),
+            "state": hasattr(self.battle_controller, 'get_initial_battle_state')
+        }
+        
+        print(f"🔍 [battle_prep_window.py] 控制器能力: {capabilities}")
+        return capabilities
+    
+    def debug_controller_state(self):
+        """调试控制器状态"""
+        print(f"🔍 [battle_prep_window.py] 控制器调试信息:")
+        print(f"   控制器对象: {self.battle_controller}")
+        print(f"   控制器类型: {type(self.battle_controller)}")
+        
+        if self.battle_controller:
+            print(f"   方法列表: {[m for m in dir(self.battle_controller) if not m.startswith('_')]}")
+            
+            if hasattr(self.battle_controller, 'current_battle'):
+                print(f"   当前战斗: {self.battle_controller.current_battle}")
+            
+            if hasattr(self.battle_controller, 'is_battle_synchronized'):
+                print(f"   同步状态: {self.battle_controller.is_battle_synchronized()}")
+
     def _select_deck_with_data(self, deck_type: str, deck_id: str, deck_data: dict):
         """选择卡组并获取真实卡牌数据"""
         print(f"🔍 [battle_prep_window.py] _select_deck_with_data: {deck_type}, {deck_id}")
@@ -730,6 +825,7 @@ class BattlePrepWindow(pygame_gui.elements.UIWindow):
             if len(deck_cards) >= 20:  # 检查卡组是否有效
                 self.selected_deck_id = deck_id
                 self.selected_deck_cards = deck_cards  # 保存真实卡牌数据
+                self.use_user_deck = True  # ✅ 让AI使用当前用户选中的卡组
                 print(f"✅ [battle_prep_window.py] 成功选择卡组: {deck_id}, 包含 {len(deck_cards)} 张卡牌")
                 self._check_ready_to_battle()
             else:
@@ -740,12 +836,22 @@ class BattlePrepWindow(pygame_gui.elements.UIWindow):
             import traceback
             traceback.print_exc()
 
-    def set_battle_start_callback(self, callback: Callable):
-        """设置战斗开始回调"""
-        self.on_battle_start = callback
+    def set_battle_start_callback(self, callback):
+        """设置战斗开始回调 - 支持同步模式"""
+        self.battle_start_callback = callback
+        print(f"📞 [battle_prep_window.py] 设置战斗开始回调: {type(callback)}")
     
     def refresh_data(self):
         """刷新数据"""
         self._load_deck_data()
         if self.selected_deck_type:
             self._update_deck_list()
+
+    """
+    # 添加到 battle_prep_window.py 的末尾来应用修复
+    BattlePrepWindow._start_pve_battle = _start_pve_battle
+    BattlePrepWindow._show_error = _show_error
+    BattlePrepWindow.set_battle_start_callback = set_battle_start_callback
+    BattlePrepWindow.check_controller_capability = check_controller_capability
+    BattlePrepWindow.debug_controller_state = debug_controller_state
+    """

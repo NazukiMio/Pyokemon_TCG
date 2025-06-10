@@ -320,54 +320,132 @@ class WelcomeScene:
         # 设置退出确认对话框
         self.setup_exit_dialog()
     
-    def setup_exit_dialog(self):
-        """设置退出确认对话框"""
-        screen_width, screen_height = self.screen.get_size()
+    # def setup_exit_dialog(self):
+    #     """设置退出确认对话框"""
+    #     screen_width, screen_height = self.screen.get_size()
         
-        # 增加对话框尺寸
-        dialog_width = int(min(500 * self.scale_factor, screen_width * 0.85))
-        dialog_height = int(min(320 * self.scale_factor, screen_height * 0.55))  # 再增加高度
+    #     # 增加对话框尺寸
+    #     dialog_width = int(min(500 * self.scale_factor, screen_width * 0.85))
+    #     dialog_height = int(min(320 * self.scale_factor, screen_height * 0.55))  # 再增加高度
+    #     dialog_x = (screen_width - dialog_width) // 2
+    #     dialog_y = (screen_height - dialog_height) // 2
+        
+    #     # 创建对话框面板（应用新样式）
+    #     self.exit_dialog_elements['panel'] = pygame_gui.elements.UIPanel(
+    #         relative_rect=pygame.Rect(dialog_x, dialog_y, dialog_width, dialog_height),
+    #         manager=self.ui_manager,
+    #         object_id='#exit_dialog'
+    #     )
+        
+    #     # 标题标签
+    #     self.exit_dialog_elements['title'] = pygame_gui.elements.UILabel(
+    #         relative_rect=pygame.Rect(30, 30, dialog_width - 60, 40),
+    #         text='Confirmar salida',
+    #         container=self.exit_dialog_elements['panel'],
+    #         manager=self.ui_manager,
+    #         object_id='#dialog_title'
+    #     )
+        
+    #     # 消息标签
+    #     self.exit_dialog_elements['message'] = pygame_gui.elements.UILabel(
+    #         relative_rect=pygame.Rect(30, 80, dialog_width - 60, 80),
+    #         text='¿Estás seguro de que quieres salir del juego?',
+    #         container=self.exit_dialog_elements['panel'],
+    #         manager=self.ui_manager,
+    #         object_id='#dialog_message'
+    #     )
+        
+    #     # 按钮（更大的边距）
+    #     button_width = int(dialog_width * 0.3)       # 再缩小按钮宽度
+    #     button_height = Theme.get_scaled_size('button_height_medium', self.scale_factor)
+    #     button_margin = 40                           # 增加边距到40
+    #     bottom_margin = 50                           # 底部边距设为50
+    #     button_spacing = 20  # 按钮之间的间距
+    #     total_buttons_width = button_width * 2 + button_spacing
+    #     start_x = (dialog_width - total_buttons_width) // 2
+        
+    #     # 计算按钮位置
+    #     button_y = dialog_height - button_height - bottom_margin
+        
+    #     # 左侧按钮（SÍ, SALIR）
+    #     self.exit_dialog_elements['yes'] = pygame_gui.elements.UIButton(
+    #         relative_rect=pygame.Rect(start_x, button_y, button_width, button_height),
+    #         text='SÍ, SALIR',
+    #         container=self.exit_dialog_elements['panel'],
+    #         manager=self.ui_manager,
+    #         object_id='#main_button'
+    #     )
+        
+    #     # 右侧按钮（CANCELAR）- 确保右边距足够
+    #     right_button_x = dialog_width - button_width - button_margin
+    #     self.exit_dialog_elements['no'] = pygame_gui.elements.UIButton(
+    #         relative_rect=pygame.Rect(start_x + button_width + button_spacing, button_y, button_width, button_height),
+    #         text='CANCELAR',
+    #         container=self.exit_dialog_elements['panel'],
+    #         manager=self.ui_manager,
+    #         object_id='#secondary_button'
+    #     )
+        
+    #     # 初始隐藏对话框
+    #     self.exit_dialog_elements['panel'].hide()
+        
+    def setup_exit_dialog(self):
+        """设置退出确认对话框，带内容位置偏移修正"""
+        dialog_width = 380
+        dialog_height = 280
+        screen_width, screen_height = self.screen.get_size()
         dialog_x = (screen_width - dialog_width) // 2
         dialog_y = (screen_height - dialog_height) // 2
-        
-        # 创建对话框面板（应用新样式）
+
         self.exit_dialog_elements['panel'] = pygame_gui.elements.UIPanel(
             relative_rect=pygame.Rect(dialog_x, dialog_y, dialog_width, dialog_height),
             manager=self.ui_manager,
             object_id='#exit_dialog'
         )
-        
-        # 标题标签
+
+        # 偏移修正值
+        x_offset = -13  # 实测偏右的像素数，微调可用 -14 ~ -20
+        label_width = 360
+        padding_top = 30
+        title_height = 40
+        message_height = 60
+        button_height = 50
+        button_width = 140
+        button_spacing = 20
+
+        # 居中标题 + 偏移
         self.exit_dialog_elements['title'] = pygame_gui.elements.UILabel(
-            relative_rect=pygame.Rect(30, 30, dialog_width - 60, 40),
+            relative_rect=pygame.Rect(
+                (dialog_width - label_width) // 2 + x_offset,
+                padding_top,
+                label_width,
+                title_height
+            ),
             text='Confirmar salida',
             container=self.exit_dialog_elements['panel'],
             manager=self.ui_manager,
             object_id='#dialog_title'
         )
-        
-        # 消息标签
+
+        # 信息文字 + 偏移
         self.exit_dialog_elements['message'] = pygame_gui.elements.UILabel(
-            relative_rect=pygame.Rect(30, 80, dialog_width - 60, 80),
+            relative_rect=pygame.Rect(
+                (dialog_width - label_width) // 2 + x_offset,
+                padding_top + title_height + 10,
+                label_width,
+                message_height
+            ),
             text='¿Estás seguro de que quieres salir del juego?',
             container=self.exit_dialog_elements['panel'],
             manager=self.ui_manager,
             object_id='#dialog_message'
         )
-        
-        # 按钮（更大的边距）
-        button_width = int(dialog_width * 0.3)       # 再缩小按钮宽度
-        button_height = Theme.get_scaled_size('button_height_medium', self.scale_factor)
-        button_margin = 40                           # 增加边距到40
-        bottom_margin = 50                           # 底部边距设为50
-        button_spacing = 20  # 按钮之间的间距
-        total_buttons_width = button_width * 2 + button_spacing
-        start_x = (dialog_width - total_buttons_width) // 2
-        
-        # 计算按钮位置
-        button_y = dialog_height - button_height - bottom_margin
-        
-        # 左侧按钮（SÍ, SALIR）
+
+        # 按钮起始位置 + 偏移
+        total_button_width = button_width * 2 + button_spacing
+        start_x = (dialog_width - total_button_width) // 2 + x_offset
+        button_y = dialog_height - button_height - 40
+
         self.exit_dialog_elements['yes'] = pygame_gui.elements.UIButton(
             relative_rect=pygame.Rect(start_x, button_y, button_width, button_height),
             text='SÍ, SALIR',
@@ -375,9 +453,7 @@ class WelcomeScene:
             manager=self.ui_manager,
             object_id='#main_button'
         )
-        
-        # 右侧按钮（CANCELAR）- 确保右边距足够
-        right_button_x = dialog_width - button_width - button_margin
+
         self.exit_dialog_elements['no'] = pygame_gui.elements.UIButton(
             relative_rect=pygame.Rect(start_x + button_width + button_spacing, button_y, button_width, button_height),
             text='CANCELAR',
@@ -385,9 +461,11 @@ class WelcomeScene:
             manager=self.ui_manager,
             object_id='#secondary_button'
         )
-        
-        # 初始隐藏对话框
+
         self.exit_dialog_elements['panel'].hide()
+
+
+
     
     def handle_event(self, event):
         """处理事件"""
@@ -462,7 +540,13 @@ class WelcomeScene:
             self.video_background.update_size(new_size)
         
         # 重新设置UI元素
+        self.clear_ui_elements()
         self.setup_ui_elements()
+        self.setup_exit_dialog()
+
+        # 如果原本正在显示退出对话框，resize 后需要重新 show 出来
+        if self.show_exit_dialog and 'panel' in self.exit_dialog_elements:
+            self.exit_dialog_elements['panel'].show()
         
         # 重新加载Logo
         if self.logo:
@@ -471,6 +555,15 @@ class WelcomeScene:
         # 重新加载Press Start图片
         if self.press_start_image:
             self.load_press_start_image()
+
+    def clear_ui_elements(self):
+        for widget in self.buttons.values():
+            widget.kill()
+        self.buttons.clear()
+
+        for widget in getattr(self, 'exit_dialog_elements', {}).values():
+            widget.kill()
+        self.exit_dialog_elements.clear()
     
     def handle_login_click(self):
         """处理登录按钮点击"""
@@ -576,6 +669,26 @@ class WelcomeScene:
         if self.toast_message:
             screen_width, screen_height = self.screen.get_size()
             self.toast_message.draw(self.screen, screen_width // 2, int(screen_height * 0.85), self.scale_factor)
+
+        # # 临时绘制对话框 panel 的可视边界和中心线
+        # panel = self.exit_dialog_elements.get('panel')
+        # if panel and self.show_exit_dialog:
+        #     panel_rect = panel.get_relative_rect()
+        #     abs_panel_x, abs_panel_y = panel.get_abs_rect().topleft
+
+        #     # 绘制 panel 边框线（红）
+        #     pygame.draw.rect(self.screen, (255, 0, 0), panel.get_abs_rect(), 2)
+
+        #     # 绘制 panel 的垂直中轴线（绿）
+        #     center_x = abs_panel_x + panel_rect.width // 2
+        #     pygame.draw.line(self.screen, (0, 255, 0), (center_x, abs_panel_y), (center_x, abs_panel_y + panel_rect.height), 2)
+
+        #     # 绘制 “SÍ, SALIR” 按钮中心（蓝）
+        #     yes_button = self.exit_dialog_elements.get('yes')
+        #     if yes_button:
+        #         btn_rect = yes_button.get_abs_rect()
+        #         btn_center_x = btn_rect.centerx
+        #         pygame.draw.line(self.screen, (0, 0, 255), (btn_center_x, btn_rect.top), (btn_center_x, btn_rect.bottom), 2)
 
     def draw_intro_text(self):
         """绘制引导图片/文字"""

@@ -412,6 +412,7 @@ class RegisterScene:
             self.video_background.update_size(new_size)
         
         # 重新设置UI元素
+        self.clear_ui_elements()
         self.setup_ui_elements()
         
         # 重新加载Logo
@@ -420,6 +421,19 @@ class RegisterScene:
         if self.subtitle_logo:
             self.load_subtitle_logo()
     
+    def clear_ui_elements(self):
+        for widget in self.buttons.values():
+            widget.kill()
+        self.buttons.clear()
+
+        for widget in getattr(self, 'inputs', {}).values():
+            widget.kill()
+        self.inputs.clear()
+
+        for widget in getattr(self, 'labels', {}).values():
+            widget.kill()
+        self.labels.clear()
+
     def handle_register(self):
         """处理注册"""
         username = self.inputs['username'].get_text()

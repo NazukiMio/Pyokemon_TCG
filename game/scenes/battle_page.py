@@ -285,12 +285,11 @@ class BattlePage:
         else:
             print("⚠️ 卡组构建窗口已经打开")
     def _open_battle_prep(self):
-        """打开对战准备窗口"""
+        """打开对战准备窗口 - 使用同步控制器"""
         print(f"🔍 [battle_page.py] 尝试打开对战准备窗口，当前状态: {self.active_windows.get('battle_prep')}")
         
         # 检查窗口是否存在且活跃
         if self.active_windows['battle_prep'] is not None:
-            # 检查窗口是否还活跃
             try:
                 if hasattr(self.active_windows['battle_prep'], 'alive') and not self.active_windows['battle_prep'].alive:
                     print(f"🔍 [battle_page.py] 窗口已关闭，重置状态")
@@ -299,37 +298,29 @@ class BattlePage:
                     print("⚠️ [battle_page.py] 对战准备窗口已经打开")
                     return
             except:
-                # 如果检查出错，重置窗口
                 print(f"🔍 [battle_page.py] 窗口状态异常，重置")
                 self.active_windows['battle_prep'] = None
         
         if self.active_windows['battle_prep'] is None:
             try:
                 from game.scenes.windows.battle.battle_prep.battle_prep_window import BattlePrepWindow
-                from game.core.battle.battle_controller import BattleController
+                from game.core.battle.synchronized_battle_controller import BattleControllerWithSync
                 
-                # 确保创建battle_controller
-                print(f"🔍 [battle_page.py] 检查battle_controller")
+                # 使用同步控制器
+                print(f"🔍 [battle_page.py] 创建同步战斗控制器")
                 if not hasattr(self, 'battle_controller') or self.battle_controller is None:
-                    print(f"🔍 [battle_page.py] 创建新的BattleController")
-                    self.battle_controller = BattleController(self.game_manager)
-                    print(f"✅ [battle_page.py] BattleController创建成功")
-                    print(f"   类型: {type(self.battle_controller)}")
-                    print(f"   has start_new_battle: {hasattr(self.battle_controller, 'start_new_battle')}")
+                    self.battle_controller = BattleControllerWithSync(self.game_manager)
+                    print(f"✅ [battle_page.py] 同步BattleController创建成功")
                 else:
                     print(f"✅ [battle_page.py] 使用现有BattleController")
 
-                # 验证battle_controller
-                if not hasattr(self.battle_controller, 'start_new_battle'):
-                    print(f"❌ [battle_page.py] BattleController没有start_new_battle方法")
-                    return
-
-                # 创建战斗控制器（如果还没有）
-                if not hasattr(self, 'battle_controller'):
+                # 验证控制器
+                if not hasattr(self.battle_controller, 'start_new_battle_synchronized'):
+                    print(f"❌ [battle_page.py] BattleController缺少同步方法，回退到普通控制器")
+                    from game.core.battle.battle_controller import BattleController
                     self.battle_controller = BattleController(self.game_manager)
-                    print(f"🔍 [battle_page.py] 创建战斗控制器")
                 
-                # 创建窗口位置和大小
+                # 创建窗口
                 window_width = int(600 * self.scale_factor)
                 window_height = int(500 * self.scale_factor)
                 window_x = (self.screen_width - window_width) // 2
@@ -337,7 +328,6 @@ class BattlePage:
                 
                 window_rect = pygame.Rect(window_x, window_y, window_width, window_height)
                 
-                # 创建对战准备窗口
                 battle_prep_window = BattlePrepWindow(
                     rect=window_rect,
                     ui_manager=self.ui_manager,
@@ -345,12 +335,12 @@ class BattlePage:
                     battle_controller=self.battle_controller
                 )
                 
-                # 设置战斗开始回调
-                battle_prep_window.set_battle_start_callback(self._on_battle_started)
+                # 设置同步战斗开始回调
+                battle_prep_window.set_battle_start_callback(self._on_battle_started_synchronized)
                 
                 self.active_windows['battle_prep'] = battle_prep_window
                 
-                print("⚔️ [battle_page.py] 对战准备窗口已打开")
+                print("⚔️ [battle_page.py] 对战准备窗口已打开（同步版本）")
                 self.current_state = "battle_prep"
                 
                 if self.on_battle_prep_click:
@@ -361,45 +351,167 @@ class BattlePage:
                 import traceback
                 traceback.print_exc()
     
-    def _on_battle_started(self, battle_id: int):
-        """处理战斗开始回调"""
-        print(f"🎮 [battle_page.py] 战斗开始回调触发: {battle_id}")
+    def _on_battle_started_synchronized(self, battle_info: dict):
+        """处理同步战斗开始回调"""
+        print(f"🎮 [battle_page.py] 同步战斗开始回调: {battle_info}")
         
         try:
-            # ✅ 销毁按钮，避免UI重叠
-            if self.deck_builder_button:
-                self.deck_builder_button.kill()
-                self.deck_builder_button = None
-            if self.battle_prep_button:
-                self.battle_prep_button.kill()
-                self.battle_prep_button = None
+            battle_id = battle_info.get('battle_id')
+            if not battle_id:
+                print(f"❌ [battle_page.py] 战斗ID缺失")
+                return
             
-            # 🆕 立即显示战斗界面
-            self._show_battle_interface(battle_id)
+            # 首先显示战斗界面
+            print(f"🎨 [battle_page.py] 开始创建战斗界面...")
+            self._show_battle_interface_synchronized(battle_id)
+            
+            # 界面创建完成后，通知控制器开始战斗
+            if hasattr(self.battle_controller, 'notify_interface_ready'):
+                print(f"📡 [battle_page.py] 通知战斗控制器界面准备完成...")
+                result = self.battle_controller.notify_interface_ready()
+                
+                if result.get('success'):
+                    print(f"✅ [battle_page.py] 战斗同步启动成功")
+                else:
+                    print(f"❌ [battle_page.py] 战斗同步启动失败: {result.get('error')}")
             
             # 设置状态
-            self.current_state = "battle_interface"  # 🔧 确保状态正确
+            self.current_state = "battle_interface"
             
-            # 关闭战斗准备窗口
+            # 关闭准备窗口
             self._close_prep_windows()
             
-            # 通知父组件（如果需要）
+            # 通知父组件
             if hasattr(self, 'on_battle_started') and self.on_battle_started:
                 self.on_battle_started(battle_id)
             
-            print(f"✅ [battle_page.py] 战斗界面显示完成")
+            print(f"✅ [battle_page.py] 同步战斗界面显示完成")
             
         except Exception as e:
-            print(f"❌ [battle_page.py] 战斗开始处理失败: {e}")
+            print(f"❌ [battle_page.py] 同步战斗开始处理失败: {e}")
             import traceback
             traceback.print_exc()
+
+    def _show_battle_interface_synchronized(self, battle_id):
+        """显示同步战斗界面"""
+        print(f"🎮 [battle_page.py] 开始显示同步战斗界面: {battle_id}")
+        
+        try:
+            # 预加载战斗缓存
+            if self.battle_cache:
+                print("📦 预加载战斗缓存...")
+                self.battle_cache.preload_battle_assets()
+            
+            # 导入修复的战斗界面
+            BattleInterface = None
+            
+            try:
+                # 首先尝试导入修复版本
+                print(f"🔄 尝试导入修复的战斗界面...")
+                from game.ui.battle.battle_interface.battle_interface import BattleInterface
+                print(f"✅ 成功导入修复版BattleInterface")
+            except Exception as e:
+                print(f"❌ 导入修复版失败，尝试原版: {e}")
+                try:
+                    from game.ui.battle.battle_interface.new_battle_interface import BattleInterface
+                    print(f"✅ 使用原版BattleInterface")
+                except Exception as e2:
+                    print(f"❌ 导入原版也失败: {e2}")
+                    BattleInterface = self._create_fallback_battle_interface()
+            
+            # 创建战斗界面实例
+            print(f"🎮 创建BattleInterface实例...")
+            
+            # 确保控制器准备完成
+            if hasattr(self.battle_controller, 'get_initial_battle_state'):
+                initial_state = self.battle_controller.get_initial_battle_state()
+                print(f"📊 获取初始战斗状态: {initial_state}")
+            
+            try:
+                # 使用4参数构造函数
+                self.battle_interface = BattleInterface(
+                    self.screen_width, 
+                    self.screen_height,
+                    self.battle_controller,
+                    self.battle_cache
+                )
+                print("✅ 使用4参数构造函数成功")
+            except Exception as e:
+                print(f"❌ 4参数构造函数失败: {e}")
+                try:
+                    # 使用3参数构造函数
+                    self.battle_interface = BattleInterface(
+                        self.screen_width, 
+                        self.screen_height,
+                        self.battle_controller
+                    )
+                    print("✅ 使用3参数构造函数成功")
+                    # 手动设置缓存
+                    if hasattr(self.battle_interface, 'battle_cache'):
+                        self.battle_interface.battle_cache = self.battle_cache
+                except Exception as e2:
+                    print(f"❌ 3参数构造函数也失败: {e2}")
+                    raise e2
+            
+            # 设置状态
+            self.current_state = "battle_interface"
+            self.current_battle_id = battle_id
+            
+            print(f"✅ [battle_page.py] 同步战斗界面创建成功")
+            print(f"   当前状态: {self.current_state}")
+            print(f"   战斗ID: {self.current_battle_id}")
+            print(f"   界面对象: {type(self.battle_interface)}")
+            
+        except Exception as e:
+            print(f"❌ [battle_page.py] 创建同步战斗界面失败: {e}")
+            import traceback
+            traceback.print_exc()
+            
+            # 创建应急界面
+            print("🚨 创建应急战斗界面...")
+            self.battle_interface = self._create_emergency_interface(battle_id)
+            self.current_state = "battle_interface"
+            self.current_battle_id = battle_id
+
+    def _on_battle_started(self, battle_id):
+        """原有的战斗开始回调 - 保持兼容性"""
+        print(f"🎮 [battle_page.py] 原有战斗开始回调触发: {battle_id}")
+        
+        # 如果是同步控制器，使用同步方法
+        if hasattr(self.battle_controller, 'is_battle_synchronized'):
+            battle_info = {"battle_id": battle_id}
+            self._on_battle_started_synchronized(battle_info)
+        else:
+            # 否则使用原有方法
+            try:
+                self._show_battle_interface(battle_id)
+                self.current_state = "battle_interface"
+                self._close_prep_windows()
+                
+                if hasattr(self, 'on_battle_started') and self.on_battle_started:
+                    self.on_battle_started(battle_id)
+            except Exception as e:
+                print(f"❌ [battle_page.py] 原有战斗开始处理失败: {e}")
     
     def get_battle_controller(self):
-        """获取战斗控制器"""
+        """获取战斗控制器 - 支持同步版本"""
         if not self.battle_controller:
-            from game.core.battle.battle_controller import BattleController
-            self.battle_controller = BattleController(self.game_manager)
+            try:
+                # 优先使用同步控制器
+                from game.core.battle.synchronized_battle_controller import BattleControllerWithSync
+                self.battle_controller = BattleControllerWithSync(self.game_manager)
+                print("✅ 创建同步战斗控制器")
+            except Exception as e:
+                print(f"⚠️ 创建同步控制器失败，使用普通控制器: {e}")
+                from game.core.battle.battle_controller import BattleController
+                self.battle_controller = BattleController(self.game_manager)
+        
         return self.battle_controller
+    
+    def is_battle_synchronized(self) -> bool:
+        """检查战斗是否使用同步模式"""
+        return (hasattr(self.battle_controller, 'is_battle_synchronized') and 
+                self.battle_controller.is_battle_synchronized())
     
     def is_battle_active(self) -> bool:
         """检查是否有活跃的战斗"""
@@ -925,3 +1037,13 @@ class BattlePage:
             self.battle_cache.cleanup()
         
         print("✅ [battle_page.py] 战斗页面清理完成")
+
+    """
+    # 添加到 battle_page.py 的末尾来应用修复
+    BattlePage._open_battle_prep = _open_battle_prep
+    BattlePage._on_battle_started_synchronized = _on_battle_started_synchronized
+    BattlePage._show_battle_interface_synchronized = _show_battle_interface_synchronized
+    BattlePage._on_battle_started = _on_battle_started
+    BattlePage.get_battle_controller = get_battle_controller
+    BattlePage.is_battle_synchronized = is_battle_synchronized
+    """

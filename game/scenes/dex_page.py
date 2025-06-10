@@ -1000,7 +1000,7 @@ class DexPage:
         
         # 标题
         title_font = pygame.font.Font(None, 32)
-        title_text = title_font.render("📖 Colección de Cartas", True, DexColors.TEXT_PRIMARY)
+        title_text = title_font.render("Colección de Cartas", True, DexColors.TEXT_PRIMARY)
         screen.blit(title_text, (20, 120))
         
         # 统计信息

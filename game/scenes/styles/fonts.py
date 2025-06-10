@@ -470,4 +470,4 @@ class FontManager:
         pass
 
 # 全局字体管理器实例
-font_manager = FontManager()
+font_manager = None

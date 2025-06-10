@@ -351,11 +351,25 @@ class LoginScene:
             self.video_background.update_size(new_size)
         
         # 重新设置UI元素
+        self.clear_ui_elements()
         self.setup_ui_elements()
         
         # 重新加载Logo
         if self.logo:
             self.load_logo()
+
+    def clear_ui_elements(self):
+        for widget in self.buttons.values():
+            widget.kill()
+        self.buttons.clear()
+
+        for widget in getattr(self, 'inputs', {}).values():
+            widget.kill()
+        self.inputs.clear()
+
+        for widget in getattr(self, 'labels', {}).values():
+            widget.kill()
+        self.labels.clear()
     
     def handle_login(self):
         """处理登录"""

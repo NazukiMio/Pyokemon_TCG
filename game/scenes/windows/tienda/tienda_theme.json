@@ -6,7 +6,7 @@
             "normal_text": "#1F2937"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "14"
         },
         "misc": {
@@ -34,7 +34,7 @@
             "normal_border": "#5865F2"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "16",
             "bold": "1"
         },
@@ -56,7 +56,7 @@
             "hovered_border": "#DC2626"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "12",
             "bold": "1"
         },
@@ -88,7 +88,7 @@
             "normal_border": "#F59E0B"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "16",
             "bold": "1"
         },
@@ -107,7 +107,7 @@
             "normal_border": "#A78BFA"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "16",
             "bold": "1"
         },
@@ -135,17 +135,17 @@
             "active_border": "#5865F2"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "14",
             "bold": "0"
         },
         "font:hovered": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "14",
             "bold": "1"
         },
         "font:selected": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "14",
             "bold": "1"
         },
@@ -191,7 +191,7 @@
             "normal_bg": "#00000000"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "14",
             "bold": "1"
         }
@@ -203,7 +203,7 @@
             "normal_bg": "#00000000"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "11",
             "bold": "0"
         }
@@ -225,12 +225,12 @@
             "active_border": "#312E81"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "12",
             "bold": "0"
         },
         "font:hovered": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "12",
             "bold": "1"
         },
@@ -258,12 +258,12 @@
             "active_border": "#065F46"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "12",
             "bold": "0"
         },
         "font:hovered": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "12",
             "bold": "1"
         },
@@ -291,12 +291,12 @@
             "active_border": "#991B1B"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "12",
             "bold": "0"
         },
         "font:hovered": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "12",
             "bold": "1"
         },
@@ -328,7 +328,7 @@
             "normal_border": "#5865F2"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "16",
             "bold": "1"
         },
@@ -350,7 +350,7 @@
             "hovered_border": "#DC2626"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "12",
             "bold": "1"
         },

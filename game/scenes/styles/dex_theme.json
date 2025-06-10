@@ -6,7 +6,7 @@
             "normal_text": "#374151"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "14"
         },
         "misc": {
@@ -33,7 +33,7 @@
             "padding": "12,8"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "16",
             "bold": "0"
         }
@@ -59,7 +59,7 @@
             "expand_direction": "down"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "14",
             "bold": "0"
         }
@@ -115,7 +115,7 @@
             "expand_direction": "down"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "14",
             "bold": "0"
         }
@@ -167,12 +167,12 @@
             "active_text": "#475569"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "14",
             "bold": "0"
         },
         "font:hovered": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "14",
             "bold": "1"
         },
@@ -200,7 +200,7 @@
             "active_text": "#FFFFFF"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "14",
             "bold": "1"
         },
@@ -228,12 +228,12 @@
             "active_text": "#475569"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "14",
             "bold": "0"
         },
         "font:hovered": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "14",
             "bold": "1"
         },
@@ -261,7 +261,7 @@
             "active_text": "#FFFFFF"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "14",
             "bold": "1"
         },
@@ -289,7 +289,7 @@
             "shadow_width": "0"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "14",
             "bold": "0"
         }
@@ -340,7 +340,7 @@
             "shadow_width": "0"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "14",
             "bold": "0"
         }
@@ -365,7 +365,7 @@
             "padding": "12,8"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "16",
             "bold": "0"
         }
@@ -377,7 +377,7 @@
             "normal_bg": "#00000000"
         },
         "font": {
-            "name": "arial",
+            "name": "segoeuisymbol",
             "size": "14",
             "bold": "0"
         }
