@@ -108,16 +108,18 @@ class BattleCardRenderer:
             text_rect = no_img_text.get_rect(center=image_rect.center)
             surface.blit(no_img_text, text_rect)
     
-    def _draw_card_info(self, surface, card_instance, y_start):
-        """绘制卡牌信息"""
+    def _draw_card_info_fixed(self, surface, card_instance, y_start, actual_rect):
+        """绘制卡牌信息（修复版）"""
         # 卡牌名称（截断长名称）
         name = card_instance.card.name
-        if len(name) > 10:
-            name = name[:8] + ".."
+        max_chars = max(8, actual_rect.width // 8)
+        if len(name) > max_chars:
+            name = name[:max_chars-2] + ".."
         
         name_text = self.name_font.render(name, True, (255, 255, 255))
-        name_x = (self.width - name_text.get_width()) // 2
-        surface.blit(name_text, (name_x, y_start))
+        name_x = actual_rect.centerx - name_text.get_width() // 2
+        if y_start + 12 < actual_rect.bottom:
+            surface.blit(name_text, (name_x, y_start))
         
         # HP或类型信息
         info_text = ""
@@ -127,8 +129,9 @@ class BattleCardRenderer:
             info_text = "Trainer"
         
         info_surface = self.info_font.render(info_text, True, (200, 200, 200))
-        info_x = (self.width - info_surface.get_width()) // 2
-        surface.blit(info_surface, (info_x, y_start + 12))
+        info_x = actual_rect.centerx - info_surface.get_width() // 2
+        if y_start + 24 < actual_rect.bottom:
+            surface.blit(info_surface, (info_x, y_start + 12))
     
     def clear_cache(self):
         """清理渲染缓存"""
@@ -210,24 +213,116 @@ class BattleCache:
         
         return self._image_cache.get(image_path)
     
-    def render_card(self, card_instance, size_type: str = 'hand', selected: bool = False) -> Optional[pygame.Surface]:
+    def _extract_card_id_from_instance(self, instance_id):
+        """从instance_id中提取原始card_id"""
+        if isinstance(instance_id, str) and '_' in instance_id:
+            parts = instance_id.split('_')
+            if len(parts) >= 3:
+                card_id = '_'.join(parts[1:-1])
+                print(f"🔍 提取card_id: {instance_id} -> {card_id}")
+                return card_id
+        
+        print(f"⚠️ 无法提取card_id，使用原始值: {instance_id}")
+        return instance_id
+
+    def render_card(self, card_instance, image_cache, selected: bool = False) -> pygame.Surface:
         """
-        渲染卡牌
+        渲染卡牌（简化版，专注清晰度）
         
         Args:
             card_instance: 卡牌实例
-            size_type: 大小类型 ('hand', 'field', 'bench', 'hover')
+            image_cache: 图片缓存
             selected: 是否选中
         """
-        if size_type not in self.card_renderers:
-            size_type = 'hand'
+        # 生成缓存键
+        cache_key = f"{card_instance.card.id}_{self.width}_{self.height}_{selected}"
         
-        renderer = self.card_renderers[size_type]
-        return renderer.render_card(card_instance, self._image_cache, selected)
-    
-    def get_card_image_path(self, card_id: str) -> str:
-        """获取卡牌图片路径"""
-        return f"card_assets/images/{card_id}.png"
+        if cache_key in self.cache:
+            return self.cache[cache_key]
+        
+        # ✅ 修复：调整卡片大小到80%
+        actual_width = int(self.width * 0.8)
+        actual_height = int(self.height * 0.8)
+        
+        # 创建卡牌表面
+        card_surf = pygame.Surface((self.width, self.height), pygame.SRCALPHA)
+        
+        # 计算居中位置
+        center_x = (self.width - actual_width) // 2
+        center_y = (self.height - actual_height) // 2
+        actual_rect = pygame.Rect(center_x, center_y, actual_width, actual_height)
+        
+        # 确定卡牌类型和边框颜色
+        border_color = self._get_card_border_color(card_instance.card)
+        if selected:
+            border_color = self.CARD_SELECTED
+        
+        # 绘制背景和边框
+        pygame.draw.rect(card_surf, self.CARD_BG, actual_rect, border_radius=4)
+        border_width = 3 if selected else 2
+        pygame.draw.rect(card_surf, border_color, actual_rect, border_width, border_radius=4)
+        
+        # ✅ 修复：正确提取card_id
+        card_id = card_instance.card.id
+        if hasattr(card_instance, 'instance_id'):
+            card_id = self._extract_card_id_from_instance(card_instance.instance_id)
+        
+        # 绘制卡牌图片
+        image_rect = pygame.Rect(
+            actual_rect.x + 4, 
+            actual_rect.y + 4, 
+            actual_rect.width - 8, 
+            int((actual_rect.width - 8) * 1.4)
+        )
+        if image_rect.bottom > actual_rect.bottom - 25:
+            image_rect.height = actual_rect.bottom - actual_rect.y - 29
+        
+        self._draw_card_image_fixed(card_surf, card_instance, image_cache, image_rect, card_id)
+        
+        # 绘制卡牌信息
+        self._draw_card_info_fixed(card_surf, card_instance, image_rect.bottom + 2, actual_rect)
+        
+        # 缓存渲染结果
+        self.cache[cache_key] = card_surf
+        return card_surf
+        
+    def _draw_card_image_fixed(self, surface, card_instance, image_cache, image_rect, card_id):
+        """绘制卡牌图片（修复版）"""
+        # ✅ 修复：使用正确的图片路径
+        image_path = f"card_assets/images/{card_id}.png"
+        
+        card_image = None
+        if image_path in image_cache:
+            card_image = image_cache[image_path]
+        elif os.path.exists(image_path):
+            try:
+                card_image = pygame.image.load(image_path)
+            except Exception as e:
+                print(f"❌ 加载图片失败: {e}")
+        
+        if card_image:
+            # ✅ 修复：使用缩放而不是裁剪
+            image_size = card_image.get_rect()
+            scale_x = image_rect.width / image_size.width
+            scale_y = image_rect.height / image_size.height
+            scale = min(scale_x, scale_y)  # 保持宽高比
+            
+            scaled_width = int(image_size.width * scale)
+            scaled_height = int(image_size.height * scale)
+            scaled_image = pygame.transform.scale(card_image, (scaled_width, scaled_height))
+            
+            # 居中显示
+            center_x = image_rect.centerx - scaled_width // 2
+            center_y = image_rect.centery - scaled_height // 2
+            surface.blit(scaled_image, (center_x, center_y))
+        else:
+            # 绘制占位符
+            pygame.draw.rect(surface, (80, 80, 80), image_rect)
+            
+            # "无图片"文字
+            no_img_text = self.info_font.render("Sin imagen", True, (200, 200, 200))
+            text_rect = no_img_text.get_rect(center=image_rect.center)
+            surface.blit(no_img_text, text_rect)
     
     def preload_cards_from_battle(self, battle_controller):
         """从战斗控制器预加载卡牌"""

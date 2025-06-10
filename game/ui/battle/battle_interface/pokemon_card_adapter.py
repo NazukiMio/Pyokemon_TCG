@@ -6,7 +6,7 @@ Pokemon卡片适配器 - 将现有Card类适配为pygamecards格式
 """
 
 import pygame
-# import os
+import os
 from functools import cached_property
 from pygame_cards.abstract import AbstractCard, AbstractCardGraphics
 from pygame_cards.set import CardsSet
@@ -30,85 +30,103 @@ class PokemonCardGraphics(AbstractCardGraphics):
             self.text_font = pygame.font.Font(None, 10)
             self.number_font = pygame.font.Font(None, 12)
         
+    def _extract_card_id_from_instance(self, instance_id):
+        """从instance_id中提取原始card_id"""
+        if isinstance(instance_id, str) and '_' in instance_id:
+            parts = instance_id.split('_')
+            if len(parts) >= 3:
+                # 移除第一个部分(player_id)和最后一个部分(instance_number)
+                card_id = '_'.join(parts[1:-1])
+                print(f"🔍 提取card_id: {instance_id} -> {card_id}")
+                return card_id
         
-    
+        print(f"⚠️ 无法提取card_id，使用原始值: {instance_id}")
+        return instance_id
+
     @cached_property
     def surface(self) -> pygame.Surface:
-        """Renderiza la imagen de la carta Pokémon (usando caché si es posible)."""
-        print(f"🔍 [Gráficos] Renderizando carta: {self.pokemon_card.name}")
-        image_loaded = False
+        """渲染Pokemon卡片"""
+        print(f"🔍 渲染卡牌: {self.pokemon_card.name}")
+        
+        # ✅ 修复：提取正确的card_id
+        card_id = self.pokemon_card.id
+        if hasattr(self.card, 'instance_id'):
+            instance_id = self.card.instance_id
+            card_id = self._extract_card_id_from_instance(instance_id)
+        
+        # ✅ 修复：使用正确的图片路径
+        image_path = f"card_assets/images/{card_id}.png"
+        
         card_image = None
-
+        
+        # 优先从 BattleCache 缓存获取图片
         if hasattr(PokemonCardAdapter, 'battle_cache'):
-            # 构造图片路径，例如 card_id 为卡牌 ID
-            card_id = self.pokemon_card.id
-            image_path = os.path.join("card_assets", "images", f"{card_id}.png")
-            # 从缓存获取图片表面（若未缓存会自动加载）
-            cached_image = PokemonCardAdapter.battle_cache.get_cached_image(image_path)
-            if cached_image:
-                card_image = cached_image
-                image_loaded = True
-                print(f"   ✅ 从缓存加载图片: {image_path}")
-        # if not image_loaded:
-        #     if card_image is None and os.path.exists(corrected_path):
-        #         card_image = pygame.image.load(corrected_path)
-        #         image_loaded = True
-        #         print(f"   ✅ 图片加载成功: {card_image.get_size()}")
-
-        # Intentar obtener la imagen desde BattleCache si está configurada
-        cache = getattr(PokemonCardAdapter, "_battle_cache_instance", None)
-        if cache and hasattr(self.pokemon_card, "image_path"):
-            # Corregir la ruta igual que antes
-            import os
-            original_path = self.pokemon_card.image_path
-            if original_path and not original_path.startswith('card_assets'):
-                corrected_path = os.path.join('card_assets', original_path.replace('\\', os.sep).replace('/', os.sep))
-            else:
-                corrected_path = original_path
-            if corrected_path:
-                # Obtener imagen del caché (esto carga y cachea si no estaba cargada)
-                card_image = cache.get_cached_image(corrected_path)
-                if card_image:
-                    image_loaded = True
-                    print(f"   ✅ Imagen cargada desde caché: {corrected_path}")
-                else:
-                    print(f"   ❌ Imagen no encontrada en caché: {corrected_path}")
-        # Si no se cargó via caché, intentar cargar del archivo (y se cacheará internamente)
-        if not image_loaded and hasattr(self.pokemon_card, "image_path"):
-            try:
-                import os
-                corrected_path = corrected_path if 'corrected_path' in locals() else self.pokemon_card.image_path
-                if corrected_path and os.path.exists(corrected_path):
-                    card_image = pygame.image.load(corrected_path)
-                    image_loaded = True
-                    print(f"   ✅ Imagen cargada desde archivo: {corrected_path}")
-                    # Opcional: guardar en caché manualmente
-                    if cache:
-                        cache._image_cache[corrected_path] = card_image
-                else:
-                    print(f"   ❌ Archivo de imagen no encontrado: {corrected_path}")
-            except Exception as e:
-                print(f"   ❌ Falló la carga de imagen: {e}")
-
-        if image_loaded and card_image:
-            # Escalar la imagen al tamaño de la carta
-            scaled_image = pygame.transform.scale(card_image, self.size)
-            return scaled_image
+            card_image = PokemonCardAdapter.battle_cache.get_cached_image(image_path)
+        
+        # 如果缓存未命中，再尝试从硬盘加载
+        if card_image:
+            print("   ✅ 从缓存加载卡牌图片")
         else:
-            # Fallback: dibujar representación básica si no hay imagen
-            print("   🎨 Usando representación gráfica genérica de la carta")
-            surf = pygame.Surface(self.size, pygame.SRCALPHA)
-            self._draw_base_card(surf)
-            if self.pokemon_card.hp:
-                self._draw_pokemon_card(surf)
-            else:
-                self._draw_trainer_card(surf)
+            try:
+                if os.path.exists(image_path):
+                    card_image = pygame.image.load(image_path)
+                    print(f"   ✅ 图片加载成功: {card_image.get_size()}")
+                else:
+                    print(f"   ❌ 图片文件不存在: {image_path}")
+            except Exception as e:
+                print(f"   ❌ 图片加载失败: {e}")
+        
+        # ✅ 修复：调整卡片大小到80%并使用缩放而不是裁剪
+        # 计算80%大小
+        target_width = int(self.size[0] * 0.8)
+        target_height = int(self.size[1] * 0.8)
+        
+        # 创建表面（保持原始大小用于居中）
+        surf = pygame.Surface(self.size, pygame.SRCALPHA)
+        
+        # 如成功获得图片，则缩放后返回
+        if card_image:
+            # 计算缩放比例，保持宽高比
+            image_rect = card_image.get_rect()
+            scale_x = target_width / image_rect.width
+            scale_y = target_height / image_rect.height
+            scale = min(scale_x, scale_y)  # 使用较小的缩放比例以保持完整显示
+            
+            # 计算缩放后的尺寸
+            scaled_width = int(image_rect.width * scale)
+            scaled_height = int(image_rect.height * scale)
+            
+            # 缩放图片
+            scaled_image = pygame.transform.scale(card_image, (scaled_width, scaled_height))
+            
+            # 计算居中位置
+            center_x = (self.size[0] - scaled_width) // 2
+            center_y = (self.size[1] - scaled_height) // 2
+            
+            # 渲染缩放后的图片
+            surf.blit(scaled_image, (center_x, center_y))
+            print(f"✅ 渲染卡牌图片: {self.pokemon_card.name} (缩放比例: {scale:.2f})")
             return surf
-    
-    def _draw_base_card(self, surf):
-        """绘制基础卡片"""
+        
+        # 否则执行原有降级绘制...
+        print("   🎨 使用简化绘制卡牌图形")
+        
+        # ✅ 修复：绘制到80%大小的区域
+        padding = (self.size[0] - target_width) // 2
+        render_rect = pygame.Rect(padding, padding, target_width, target_height)
+        
+        self._draw_base_card_fixed(surf, render_rect)
+        if self.pokemon_card.hp:
+            self._draw_pokemon_card_fixed(surf, render_rect)
+        else:
+            self._draw_trainer_card_fixed(surf, render_rect)
+        
+        return surf
+
+    def _draw_base_card_fixed(self, surf, rect):
+        """绘制基础卡片（修复版）"""
         # 圆角矩形背景
-        radius = int(0.08 * min(*self.size))
+        radius = int(0.08 * min(rect.width, rect.height))
         
         # 根据稀有度确定边框颜色
         rarity_colors = {
@@ -121,88 +139,86 @@ class PokemonCardGraphics(AbstractCardGraphics):
         border_color = rarity_colors.get(self.pokemon_card.rarity, (150, 150, 150))
         
         # 卡片背景
-        pygame.draw.rect(surf, (240, 240, 240), surf.get_rect(), 0, radius)
-        pygame.draw.rect(surf, border_color, surf.get_rect(), 3, radius)
+        pygame.draw.rect(surf, (240, 240, 240), rect, 0, radius)
+        pygame.draw.rect(surf, border_color, rect, 3, radius)
     
-    def _draw_pokemon_card(self, surf):
-        """绘制Pokemon卡片"""
+    def _draw_pokemon_card_fixed(self, surf, rect):
+        """绘制Pokemon卡片（修复版）"""
+        # ✅ 动态调整字体大小
+        name_font_size = max(12, rect.height // 10)
+        number_font_size = max(10, rect.height // 12)
+        text_font_size = max(8, rect.height // 15)
+        
+        try:
+            name_font = pygame.font.SysFont("arial", name_font_size, bold=True)
+            number_font = pygame.font.SysFont("arial", number_font_size, bold=True)
+            text_font = pygame.font.SysFont("arial", text_font_size)
+        except:
+            name_font = pygame.font.Font(None, name_font_size)
+            number_font = pygame.font.Font(None, number_font_size)
+            text_font = pygame.font.Font(None, text_font_size)
+        
         # 卡片名称
         name = self.pokemon_card.name
-        if len(name) > 12:
-            name = name[:10] + ".."
+        max_name_chars = rect.width // 8
+        if len(name) > max_name_chars:
+            name = name[:max_name_chars-2] + ".."
         
-        name_surface = self.title_font.render(name, True, (50, 50, 50))
-        name_rect = name_surface.get_rect(centerx=self.size[0]//2, y=8)
+        name_surface = name_font.render(name, True, (50, 50, 50))
+        name_rect = name_surface.get_rect(centerx=rect.centerx, y=rect.y + 5)
         surf.blit(name_surface, name_rect)
         
         # HP值
         hp_text = f"HP: {self.pokemon_card.hp}"
-        hp_surface = self.number_font.render(hp_text, True, (255, 0, 0))
-        hp_rect = hp_surface.get_rect(right=self.size[0]-8, y=8)
+        hp_surface = number_font.render(hp_text, True, (255, 0, 0))
+        hp_rect = hp_surface.get_rect(right=rect.right-5, y=rect.y + 5)
         surf.blit(hp_surface, hp_rect)
         
         # 类型标识
         if self.pokemon_card.types:
-            type_text = "/".join(self.pokemon_card.types[:2])  # 最多显示2个类型
-            type_surface = self.text_font.render(type_text, True, (100, 100, 100))
-            type_rect = type_surface.get_rect(centerx=self.size[0]//2, y=name_rect.bottom + 5)
+            type_text = "/".join(self.pokemon_card.types[:2])
+            type_surface = text_font.render(type_text, True, (100, 100, 100))
+            type_rect = type_surface.get_rect(centerx=rect.centerx, y=name_rect.bottom + 3)
             surf.blit(type_surface, type_rect)
-        
-        # 攻击技能
-        if self.pokemon_card.attacks:
-            attack_y = self.size[1] // 2
-            for i, attack in enumerate(self.pokemon_card.attacks[:2]):  # 最多显示2个攻击
-                attack_name = attack.name
-                if len(attack_name) > 8:
-                    attack_name = attack_name[:6] + ".."
-                
-                attack_surface = self.text_font.render(attack_name, True, (80, 80, 80))
-                attack_rect = attack_surface.get_rect(x=8, y=attack_y + i * 15)
-                surf.blit(attack_surface, attack_rect)
-                
-                # 伤害值
-                damage = attack.damage or "0"
-                damage_surface = self.text_font.render(damage, True, (200, 0, 0))
-                damage_rect = damage_surface.get_rect(right=self.size[0]-8, y=attack_y + i * 15)
-                surf.blit(damage_surface, damage_rect)
-        
-        # 稀有度标识
-        rarity_text = self.pokemon_card.rarity[0]  # 第一个字母
-        rarity_surface = self.text_font.render(rarity_text, True, (100, 100, 100))
-        rarity_rect = rarity_surface.get_rect(right=self.size[0]-5, bottom=self.size[1]-5)
-        surf.blit(rarity_surface, rarity_rect)
-    
-    def _draw_trainer_card(self, surf):
-        """绘制训练师卡片"""
-        # 卡片名称
-        name = self.pokemon_card.name
-        if len(name) > 12:
-            name = name[:10] + ".."
-        
-        name_surface = self.title_font.render(name, True, (50, 50, 50))
-        name_rect = name_surface.get_rect(centerx=self.size[0]//2, y=8)
-        surf.blit(name_surface, name_rect)
-        
-        # 训练师标识
-        trainer_surface = self.text_font.render("TRAINER", True, (0, 100, 200))
-        trainer_rect = trainer_surface.get_rect(centerx=self.size[0]//2, y=name_rect.bottom + 5)
-        surf.blit(trainer_surface, trainer_rect)
-        
-        # 效果描述（简化）
-        if hasattr(self.pokemon_card, 'text') and self.pokemon_card.text:
-            desc_lines = self._wrap_text(self.pokemon_card.text, 10)
-            desc_y = self.size[1] // 2 - len(desc_lines) * 6
-            
-            for line in desc_lines:
-                desc_surface = self.text_font.render(line, True, (60, 60, 60))
-                desc_rect = desc_surface.get_rect(centerx=self.size[0]//2, y=desc_y)
-                surf.blit(desc_surface, desc_rect)
-                desc_y += 12
         
         # 稀有度标识
         rarity_text = self.pokemon_card.rarity[0]
-        rarity_surface = self.text_font.render(rarity_text, True, (100, 100, 100))
-        rarity_rect = rarity_surface.get_rect(right=self.size[0]-5, bottom=self.size[1]-5)
+        rarity_surface = text_font.render(rarity_text, True, (100, 100, 100))
+        rarity_rect = rarity_surface.get_rect(right=rect.right-3, bottom=rect.bottom-3)
+        surf.blit(rarity_surface, rarity_rect)
+    
+    def _draw_trainer_card_fixed(self, surf, rect):
+        """绘制训练师卡片（修复版）"""
+        # ✅ 动态调整字体大小
+        name_font_size = max(12, rect.height // 10)
+        text_font_size = max(8, rect.height // 15)
+        
+        try:
+            name_font = pygame.font.SysFont("arial", name_font_size, bold=True)
+            text_font = pygame.font.SysFont("arial", text_font_size)
+        except:
+            name_font = pygame.font.Font(None, name_font_size)
+            text_font = pygame.font.Font(None, text_font_size)
+        
+        # 卡片名称
+        name = self.pokemon_card.name
+        max_name_chars = rect.width // 8
+        if len(name) > max_name_chars:
+            name = name[:max_name_chars-2] + ".."
+        
+        name_surface = name_font.render(name, True, (50, 50, 50))
+        name_rect = name_surface.get_rect(centerx=rect.centerx, y=rect.y + 5)
+        surf.blit(name_surface, name_rect)
+        
+        # 训练师标识
+        trainer_surface = text_font.render("TRAINER", True, (0, 100, 200))
+        trainer_rect = trainer_surface.get_rect(centerx=rect.centerx, y=name_rect.bottom + 3)
+        surf.blit(trainer_surface, trainer_rect)
+        
+        # 稀有度标识
+        rarity_text = self.pokemon_card.rarity[0]
+        rarity_surface = text_font.render(rarity_text, True, (100, 100, 100))
+        rarity_rect = rarity_surface.get_rect(right=rect.right-3, bottom=rect.bottom-3)
         surf.blit(rarity_surface, rarity_rect)
     
     def _wrap_text(self, text: str, max_chars: int) -> list:

@@ -73,15 +73,25 @@ class BattleController:
     
     def get_current_state(self) -> Dict[str, Any]:
         """Obtener estado actual de batalla"""
+        
         if not self.current_battle:
             return {"success": False, "error": "No hay batalla activa"}
         
         try:
             # Usar método de estado para UI existente
             state = self.current_battle.get_game_state_for_ui()
+            
+            # 🔍 添加调试信息
+            print(f"🔍 [调试] battle_controller.get_current_state():")
+            print(f"   current_battle类型: {type(self.current_battle)}")
+            print(f"   get_game_state_for_ui()返回类型: {type(state)}")
+            print(f"   state属性: {[attr for attr in dir(state) if not attr.startswith('_')]}")
+            print(f"   包装后返回类型: dict")
+            
             return {"success": True, "state": state}
             
         except Exception as e:
+            print(f"❌ [调试] get_current_state异常: {e}")
             return {"success": False, "error": f"Fallo al obtener estado: {e}"}
     
     def process_player_action(self, action_data: Dict[str, Any]) -> Dict[str, Any]:

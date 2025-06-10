@@ -8,6 +8,7 @@
 
 import pygame
 import os
+import time
 from typing import Dict, List, Optional, Callable
 from pygame_cards.board import GameBoard, GameBoardGraphic
 from pygame_cards.hands import AlignedHand, VerticalPileGraphic
@@ -23,18 +24,138 @@ from .pokemon_card_adapter import PokemonCardAdapter, convert_to_pokemon_cardsse
 class PokemonCardsManager(CardsManager):
     def populate_from_state(self, battle_state):
         """
-        Pobla las zonas de CardsManager a partir del estado de batalla dado.
-        Crea adaptadores PokemonCardAdapter para cada carta y los asigna a sus zonas.
+        从战斗状态填充CardsManager的区域。
+        为每张卡创建PokemonCardAdapter并分配到相应区域。
         """
+        print(f"🔍 [调试] PokemonCardsManager.populate_from_state():")
+        print(f"   接收参数类型: {type(battle_state)}")
+        
         if not hasattr(self, "interface") or not getattr(self, "interface"):
-            print("⚠️ PokemonCardsManager: no está vinculada a ninguna BattleInterface")
+            print("⚠️ PokemonCardsManager: 没有关联到任何BattleInterface")
             return
-        # Delegar en BattleInterface.setup_from_battle_state para la lógica de poblado
+        
+        # ✅ 修复：直接使用传入的字典，不要检查"state"键
+        if isinstance(battle_state, dict):
+            print(f"🔍 [调试] battle_state是字典，键: {list(battle_state.keys())}")
+            # 直接传递字典给setup_from_battle_state
+            actual_state = battle_state
+        else:
+            actual_state = battle_state
+            print(f"🔍 [调试] 直接使用状态，类型: {type(actual_state)}")
+        
+        # 委托给BattleInterface.setup_from_battle_state处理填充逻辑
         try:
-            self.interface.setup_from_battle_state(battle_state)
+            self.interface.setup_from_battle_state(actual_state)
+            print("✅ setup_from_battle_state调用成功")
         except Exception as e:
-            print(f"❌ Error al poblar desde estado: {e}")
-
+            print(f"❌ 从状态填充失败: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def get_battle_cache(self):
+        """获取战斗缓存实例"""
+        if hasattr(self, "_battle_cache"):
+            return self._battle_cache
+        return None
+    
+    def set_battle_cache(self, cache):
+        """设置战斗缓存实例"""
+        self._battle_cache = cache
+        
+        # 同时设置给PokemonCardAdapter
+        try:
+            from .pokemon_card_adapter import PokemonCardAdapter
+            PokemonCardAdapter.battle_cache = cache
+            print("✅ 战斗缓存已设置到PokemonCardAdapter")
+        except Exception as e:
+            print(f"❌ 设置PokemonCardAdapter缓存失败: {e}")
+    
+    def sync_with_battle_state(self, battle_state):
+        """与战斗状态同步（别名方法）"""
+        self.populate_from_state(battle_state)
+    
+    def get_card_count_summary(self):
+        """获取卡牌数量统计"""
+        if not hasattr(self, "interface") or not self.interface:
+            return {}
+        
+        try:
+            game_board = self.interface.game_board
+            summary = {}
+            
+            # 统计各区域卡牌数量
+            areas = {
+                'player_hand': '玩家手牌',
+                'player_active': '玩家前排',
+                'player_deck': '玩家卡组',
+                'opponent_hand': '对手手牌',
+                'opponent_active': '对手前排',
+                'opponent_deck': '对手卡组'
+            }
+            
+            for area_name, display_name in areas.items():
+                if hasattr(game_board, area_name):
+                    cardset = getattr(game_board, area_name)
+                    if hasattr(cardset, 'cards'):
+                        summary[display_name] = len(cardset.cards)
+                    else:
+                        summary[display_name] = 0
+                else:
+                    summary[display_name] = 0
+            
+            return summary
+            
+        except Exception as e:
+            print(f"❌ 获取卡牌统计失败: {e}")
+            return {}
+    
+    def validate_state(self, battle_state):
+        """验证战斗状态的有效性"""
+        if not isinstance(battle_state, dict):
+            return False, "battle_state不是字典格式"
+        
+        required_keys = ['player', 'opponent']
+        for key in required_keys:
+            if key not in battle_state:
+                return False, f"缺少必需的键: {key}"
+        
+        # 验证玩家数据结构
+        player_data = battle_state.get('player', {})
+        opponent_data = battle_state.get('opponent', {})
+        
+        for data_name, data in [('player', player_data), ('opponent', opponent_data)]:
+            if not isinstance(data, dict):
+                return False, f"{data_name}数据不是字典格式"
+        
+        return True, "战斗状态有效"
+    
+    def debug_print_state(self, battle_state):
+        """调试打印战斗状态信息"""
+        print("🔍 [调试] 战斗状态详情:")
+        print(f"   类型: {type(battle_state)}")
+        
+        if isinstance(battle_state, dict):
+            print(f"   键: {list(battle_state.keys())}")
+            
+            if 'player' in battle_state:
+                player_data = battle_state['player']
+                print(f"   玩家数据: {type(player_data)}")
+                if isinstance(player_data, dict):
+                    print(f"     键: {list(player_data.keys())}")
+                    print(f"     手牌数量: {player_data.get('hand_size', 'N/A')}")
+                    print(f"     卡组数量: {player_data.get('deck_size', 'N/A')}")
+            
+            if 'opponent' in battle_state:
+                opponent_data = battle_state['opponent']
+                print(f"   对手数据: {type(opponent_data)}")
+                if isinstance(opponent_data, dict):
+                    print(f"     键: {list(opponent_data.keys())}")
+                    print(f"     手牌数量: {opponent_data.get('hand_size', 'N/A')}")
+                    print(f"     卡组数量: {opponent_data.get('deck_size', 'N/A')}")
+        
+        # 验证状态
+        is_valid, message = self.validate_state(battle_state)
+        print(f"   状态有效性: {is_valid} - {message}")
 class FixedPokemonFieldGraphic(VerticalPileGraphic):
     """修复的Pokemon场地图形类"""
     
@@ -422,7 +543,8 @@ class BattleInterface:
         self.battle_controller = battle_controller
         self.battle_cache = battle_cache
         if self.battle_cache:
-            PokemonCardAdapter.set_battle_cache(self.battle_cache)
+            from game.ui.battle.battle_interface.pokemon_card_adapter import PokemonCardAdapter
+            PokemonCardAdapter.battle_cache = self.battle_cache
         
         # 等待战斗控制器准备完成
         self._wait_for_battle_ready()
@@ -693,6 +815,15 @@ class BattleInterface:
             battle_manager = self.battle_controller.current_battle
             self.battle_state = battle_manager.battle_state
             
+            # 🔍 添加调试信息
+            print(f"🔍 [调试] battle_manager类型: {type(battle_manager)}")
+            print(f"🔍 [调试] battle_state类型: {type(self.battle_state)}")
+            print(f"🔍 [调试] battle_state属性: {dir(self.battle_state)}")
+            if hasattr(self.battle_state, 'get_player_state'):
+                print(f"✅ [调试] battle_state有get_player_state方法")
+            else:
+                print(f"❌ [调试] battle_state没有get_player_state方法")
+
             player_state = battle_manager.get_player_state(1)  # 玩家ID=1
             ai_state = battle_manager.get_player_state(999)    # AI玩家ID=999
             
@@ -764,136 +895,182 @@ class BattleInterface:
         Configura la interfaz según el estado de batalla proporcionado.
         Agrega las cartas correspondientes a cada zona visual.
         """
-        # Obtener el gestor de batalla y estados de jugadores
-        if hasattr(battle_state, "get_player_state"):
-            battle_manager = battle_state
-        elif hasattr(battle_state, "current_battle"):
-            battle_manager = battle_state.current_battle
-        else:
-            print("⚠️ battle_state no contiene información de batalla válida")
+        print(f"🔍 [调试] setup_from_battle_state接收到:")
+        print(f"   参数类型: {type(battle_state)}")
+        
+        # ✅ 修复：直接处理字典格式的状态
+        if not isinstance(battle_state, dict):
+            print("❌ battle_state不是字典格式")
             return
+        
+        # 从字典中提取玩家状态
+        player_data = battle_state.get('player', {})
+        opponent_data = battle_state.get('opponent', {})
+        
+        print(f"🔍 [调试] 玩家数据: {player_data}")
+        print(f"🔍 [调试] 对手数据: {opponent_data}")
+        
+        # ✅ 清理所有卡牌区域
+        self._clear_all_cardsets()
+        
+        try:
+            # ✅ 根据字典数据填充界面
+            self._populate_from_dict_data(player_data, opponent_data)
+            print("✅ 界面数据填充完成")
+            
+        except Exception as e:
+            print(f"❌ 填充界面数据失败: {e}")
+            import traceback
+            traceback.print_exc()
 
-        player_state = battle_manager.get_player_state(1)
-        opponent_state = battle_manager.get_player_state(999)
-
-        # Limpiar todas las zonas antes de poblar
-        # Mano del jugador
-        self.game_board.player_hand.clear()
-        if player_state and player_state.hand:
-            # Convertir las cartas de la mano a adaptadores PokemonCardAdapter
-            player_hand_cards = convert_to_pokemon_cardsset(player_state.hand, "Mano Jugador")
-            self.game_board.player_hand.extend(player_hand_cards)
-            if hasattr(self.game_board.player_hand, "graphics"):
-                self.game_board.player_hand.graphics.clear_cache()
-
-        # Zona Activa del jugador
-        self.game_board.player_active.clear()
-        if player_state and player_state.active_pokemon:
-            active_cardset = convert_to_pokemon_cardsset([player_state.active_pokemon], "Activo Jugador")
-            self.game_board.player_active.extend(active_cardset)
-            if hasattr(self.game_board.player_active, "graphics"):
-                self.game_board.player_active.graphics.clear_cache()
-
-        # Zonas de Banca del jugador (hasta 3 Pokémon)
-        bench_areas = [
-            self.game_board.player_bench_1,
-            self.game_board.player_bench_2,
-            self.game_board.player_bench_3
+    def _clear_all_cardsets(self):
+        """清理所有卡牌区域"""
+        if not hasattr(self, 'game_board'):
+            print("⚠️ game_board 未初始化")
+            return
+        
+        cardsets_to_clear = []
+        
+        # 安全地获取所有卡牌区域
+        cardset_names = [
+            'player_hand', 'player_active', 'player_bench_1', 'player_bench_2', 'player_bench_3',
+            'player_deck', 'player_discard', 'opponent_hand', 'opponent_active', 
+            'opponent_bench_1', 'opponent_bench_2', 'opponent_bench_3', 
+            'opponent_deck', 'opponent_discard'
         ]
-        # Limpiar primero todas las bancas
-        for area in bench_areas:
-            area.clear()
-        if player_state:
-            bench_pokemon = player_state.bench_pokemon if hasattr(player_state, "bench_pokemon") else []
-            for i, pokemon in enumerate(bench_pokemon[:3]):  # máx. 3 en banca
-                if i < len(bench_areas) and pokemon is not None:
-                    bench_slot_cardset = convert_to_pokemon_cardsset([pokemon], f"Banca Jucador {i+1}")
-                    bench_areas[i].extend(bench_slot_cardset)
-                    if hasattr(bench_areas[i], "graphics"):
-                        bench_areas[i].graphics.clear_cache()
+        
+        for name in cardset_names:
+            if hasattr(self.game_board, name):
+                cardset = getattr(self.game_board, name)
+                if cardset and hasattr(cardset, 'clear'):
+                    cardsets_to_clear.append(cardset)
+        
+        # 清理卡牌区域
+        for cardset in cardsets_to_clear:
+            try:
+                cardset.clear()
+            except Exception as e:
+                print(f"❌ 清理卡牌区域失败: {e}")
+        
+        print("✅ 卡牌区域清理完成")
 
-        # Pila de descarte del jugador
-        self.game_board.player_discard.clear()
-        if player_state and hasattr(player_state, "discard_pile"):
-            discard_cards = player_state.discard_pile
-        elif player_state and hasattr(player_state, "discard"):
-            discard_cards = player_state.discard  # si la propiedad se llama así
-        else:
-            discard_cards = []
-        if discard_cards:
-            discard_cardset = convert_to_pokemon_cardsset(discard_cards, "Descartes Jugador")
-            self.game_board.player_discard.extend(discard_cardset)
-            if hasattr(self.game_board.player_discard, "graphics"):
-                self.game_board.player_discard.graphics.clear_cache()
+    def _populate_from_dict_data(self, player_data, opponent_data):
+        """根据字典数据填充界面"""
+        
+        # ✅ 处理玩家前排Pokemon
+        if player_data.get('active_pokemon'):
+            active_info = player_data['active_pokemon']
+            print(f"🔍 设置玩家前排: {active_info}")
+            if hasattr(self.game_board, 'player_active'):
+                self._create_placeholder_card(self.game_board.player_active, active_info)
+        
+        # ✅ 处理对手前排Pokemon
+        if opponent_data.get('active_pokemon'):
+            active_info = opponent_data['active_pokemon']
+            print(f"🔍 设置对手前排: {active_info}")
+            if hasattr(self.game_board, 'opponent_active'):
+                self._create_placeholder_card(self.game_board.opponent_active, active_info)
+        
+        # ✅ 处理手牌数量显示
+        player_hand_cards = player_data.get('hand', [])
+        if player_hand_cards and hasattr(self.game_board, 'player_hand'):
+            for i, card_data in enumerate(player_hand_cards[:7]):  # 最多显示7张
+                if isinstance(card_data, dict):
+                    card_info = {
+                        'name': card_data.get('name', f'Hand Card {i+1}'),
+                        'instance_id': card_data.get('instance_id', f'hand_{i+1}')
+                    }
+                else:
+                    # 如果是对象，尝试提取属性
+                    card_info = {
+                        'name': getattr(card_data, 'name', f'Hand Card {i+1}'),
+                        'instance_id': getattr(card_data, 'instance_id', f'hand_{i+1}')
+                    }
+                self._create_placeholder_card(self.game_board.player_hand, card_info)
+                print(f"✅ 创建玩家手牌 {i+1}: {card_info['name']}")
+        
+        # ✅ 修复：处理对手手牌（显示多张卡背）
+        opponent_hand_size = opponent_data.get('hand_size', 0)
+        print(f"🔍 对手手牌数量: {opponent_hand_size}")
+        if opponent_hand_size > 0 and hasattr(self.game_board, 'opponent_hand'):
+            for i in range(min(opponent_hand_size, 7)):  # 最多显示7张
+                card_info = {'name': 'Card Back', 'instance_id': f'opponent_hand_{i+1}'}
+                self._create_placeholder_card(self.game_board.opponent_hand, card_info)
+                print(f"✅ 创建对手手牌卡背 {i+1}")
+        
+        # ✅ 处理卡组显示
+        player_deck_size = player_data.get('deck_size', 0)
+        if player_deck_size > 0 and hasattr(self.game_board, 'player_deck'):
+            card_info = {'name': 'Player Deck', 'instance_id': 'player_deck'}
+            self._create_placeholder_card(self.game_board.player_deck, card_info)
+            print(f"✅ 创建玩家卡组 (剩余 {player_deck_size} 张)")
+        
+        opponent_deck_size = opponent_data.get('deck_size', 0)
+        if opponent_deck_size > 0 and hasattr(self.game_board, 'opponent_deck'):
+            card_info = {'name': 'Opponent Deck', 'instance_id': 'opponent_deck'}
+            self._create_placeholder_card(self.game_board.opponent_deck, card_info)
+            print(f"✅ 创建对手卡组 (剩余 {opponent_deck_size} 张)")
+        
+        # 统计结果
+        stats = []
+        if hasattr(self.game_board, 'player_hand'):
+            stats.append(f"玩家手牌: {len(self.game_board.player_hand)} 张")
+        if hasattr(self.game_board, 'opponent_hand'):
+            stats.append(f"对手手牌: {len(self.game_board.opponent_hand)} 张")
+        if hasattr(self.game_board, 'player_active'):
+            stats.append(f"玩家前排: {len(self.game_board.player_active)} 张")
+        if hasattr(self.game_board, 'opponent_active'):
+            stats.append(f"对手前排: {len(self.game_board.opponent_active)} 张")
+        
+        print(f"✅ 界面数据填充完成:")
+        for stat in stats:
+            print(f"   {stat}")
 
-        # Mano del oponente (mostrar solo dorso)
-        self.game_board.opponent_hand.clear()
-        if opponent_state and opponent_state.hand and len(opponent_state.hand) > 0:
-            # Crear carta dummy de dorso para representar la mano del oponente
+    def _extract_card_id_from_instance(self, instance_id):
+        """从instance_id中提取原始card_id"""
+        # instance_id格式: "1_xy4-1_17" -> card_id: "xy4-1"
+        if isinstance(instance_id, str) and '_' in instance_id:
+            parts = instance_id.split('_')
+            if len(parts) >= 3:
+                # 移除第一个部分(player_id)和最后一个部分(instance_number)
+                card_id = '_'.join(parts[1:-1])
+                print(f"🔍 提取card_id: {instance_id} -> {card_id}")
+                return card_id
+        
+        # 如果无法提取，返回原始值
+        print(f"⚠️ 无法提取card_id，使用原始值: {instance_id}")
+        return instance_id
+
+    def _create_placeholder_card(self, cardset, card_info):
+        """创建占位卡牌"""
+        try:
             from game.core.cards.card_data import Card
-            dummy_card = Card(id="card_back", name="Dorso de carta", rarity="Common", types=[])
-            dummy_adapter = PokemonCardAdapter(dummy_card, instance_id="opponent_hand_back")
-            self.game_board.opponent_hand.append(dummy_adapter)
-            if hasattr(self.game_board.opponent_hand, "graphics"):
-                self.game_board.opponent_hand.graphics.clear_cache()
-
-        # Zona Activa del oponente
-        self.game_board.opponent_active.clear()
-        if opponent_state and opponent_state.active_pokemon:
-            opp_active_cardset = convert_to_pokemon_cardsset([opponent_state.active_pokemon], "Activo Rival")
-            self.game_board.opponent_active.extend(opp_active_cardset)
-            if hasattr(self.game_board.opponent_active, "graphics"):
-                self.game_board.opponent_active.graphics.clear_cache()
-
-        # Zonas de Banca del oponente
-        opp_bench_areas = [
-            self.game_board.opponent_bench_1,
-            self.game_board.opponent_bench_2,
-            self.game_board.opponent_bench_3
-        ]
-        for area in opp_bench_areas:
-            area.clear()
-        if opponent_state:
-            opp_bench_pokemon = opponent_state.bench_pokemon if hasattr(opponent_state, "bench_pokemon") else []
-            for i, pokemon in enumerate(opp_bench_pokemon[:3]):  # máx. 3 en banca
-                if i < len(opp_bench_areas) and pokemon is not None:
-                    opp_bench_cardset = convert_to_pokemon_cardsset([pokemon], f"Banca Enemiga {i+1}")
-                    opp_bench_areas[i].extend(opp_bench_cardset)
-                    if hasattr(opp_bench_areas[i], "graphics"):
-                        opp_bench_areas[i].graphics.clear_cache()
-
-        # Pila de descarte del oponente (si se necesita, similar a la del jugador)
-        self.game_board.opponent_discard.clear()
-        # (Se puede poblar si hay cartas en la pila de descarte del oponente)
-
-        # Mazo del jugador (dorso de carta)
-        self.game_board.player_deck.clear()
-        if player_state:
-            deck_count = len(player_state.deck) if hasattr(player_state, "deck") else 0
-        else:
-            deck_count = 0
-        if deck_count > 0:
-            from game.core.cards.card_data import Card
-            dummy_card = Card(id="card_back", name="Dorso de carta", rarity="Common", types=[])
-            dummy_adapter = PokemonCardAdapter(dummy_card, instance_id="player_deck_back")
-            self.game_board.player_deck.append(dummy_adapter)
-            if hasattr(self.game_board.player_deck, "graphics"):
-                self.game_board.player_deck.graphics.clear_cache()
-
-        # Mazo del oponente (dorso de carta)
-        self.game_board.opponent_deck.clear()
-        if opponent_state:
-            opp_deck_count = len(opponent_state.deck) if hasattr(opponent_state, "deck") else 0
-        else:
-            opp_deck_count = 0
-        if opp_deck_count > 0:
-            from game.core.cards.card_data import Card
-            dummy_card = Card(id="card_back", name="Dorso de carta", rarity="Common", types=[])
-            dummy_adapter = PokemonCardAdapter(dummy_card, instance_id="opponent_deck_back")
-            self.game_board.opponent_deck.append(dummy_adapter)
-            if hasattr(self.game_board.opponent_deck, "graphics"):
-                self.game_board.opponent_deck.graphics.clear_cache()
-
+            from .pokemon_card_adapter import PokemonCardAdapter
+            
+            # ✅ 修复：提取正确的card_id
+            instance_id = card_info.get('instance_id', 'placeholder')
+            if instance_id != 'placeholder':
+                card_id = self._extract_card_id_from_instance(instance_id)
+            else:
+                card_id = 'placeholder'
+            
+            # 创建简单的占位卡牌
+            placeholder_card = Card(
+                id=card_id,  # 使用提取的card_id
+                name=card_info.get('name', 'Unknown'),
+                rarity="Common",
+                types=[]
+            )
+            
+            adapter = PokemonCardAdapter(placeholder_card)
+            cardset.append(adapter)
+            
+            print(f"✅ 创建占位卡牌: {card_info.get('name', 'Unknown')} (ID: {card_id})")
+            
+        except Exception as e:
+            print(f"❌ 创建占位卡牌失败: {e}")
+            import traceback
+            traceback.print_exc()
     def _safe_update_cardset(self, cardset: CardsSet, cards_data, name: str):
         """安全地更新卡牌集合"""
         try:
@@ -952,74 +1129,101 @@ class BattleInterface:
                 print("🔙 ESC键按下，返回战斗页面")
                 return "back_to_battle_page"
         
-        # 处理 pygame_gui 按钮事件（💡 必须加这句！）
-        if self.cards_manager and self.cards_manager.ui_manager:
-            self.cards_manager.ui_manager.process_events(event)
+        # ✅ 修复：移除ui_manager访问，让BattlePage处理pygame_gui事件
+        # ❌ 删除这些错误的代码：
+        # if self.cards_manager and self.cards_manager.ui_manager:
+        #     self.cards_manager.ui_manager.process_events(event)
 
         # 处理控制面板点击
         if event.type == pygame.MOUSEBUTTONDOWN:
-            button_clicked = self.control_panel.handle_click(event.pos)
-            if button_clicked:
-                self._handle_button_click(button_clicked)
-                return None
+            if hasattr(self, 'control_panel') and self.control_panel:
+                button_clicked = self.control_panel.handle_click(event.pos)
+                if button_clicked:
+                    self._handle_button_click(button_clicked)
+                    return None
         
-        # 处理卡牌管理器事件
-        self.cards_manager.process_events(event)
+        # ✅ 只处理卡牌管理器事件
+        if hasattr(self, 'cards_manager') and self.cards_manager:
+            self.cards_manager.process_events(event)
         
         # 处理卡牌事件
-        if event.type == CARDSSET_CLICKED:
-            self._handle_cardset_clicked(event)
-        elif event.type == CARD_MOVED:
-            self._handle_card_moved(event)
+        try:
+            # 尝试导入pygame_cards事件常量
+            from pygame_cards.events import CARDSSET_CLICKED, CARD_MOVED
+            
+            if event.type == CARDSSET_CLICKED:
+                self._handle_cardset_clicked(event)
+            elif event.type == CARD_MOVED:
+                self._handle_card_moved(event)
+        except ImportError:
+            # 如果无法导入事件常量，跳过
+            pass
         
         return None
     
-    def _handle_button_click(self, button_key: str):
+    def _handle_button_click(self, button_name):
         """处理按钮点击"""
-        print(f"🔘 按钮点击: {button_key}")
-        
-        if not self.battle_controller:
-            return
+        print(f"🎮 按钮点击: {button_name}")
         
         try:
-            if button_key == "draw_card":
-                result = self.battle_controller.process_player_action({"type": "draw_card"})
-                print(f"抽卡结果: {result}")
+            if button_name == "end_turn":
+                self._end_turn()
+            elif button_name == "forfeit":
+                self._forfeit_battle()
+            elif button_name == "draw_card":
+                self._draw_card()
+            elif button_name == "gain_energy":
+                self._gain_energy()
+            elif button_name == "attack":
+                self._attack()
+            elif button_name == "surrender":
+                self._surrender()
+
+
+        # if not self.battle_controller:
+        #     return
+        
+        # try:
+        #     if button_key == "draw_card":
+        #         result = self.battle_controller.process_player_action({"type": "draw_card"})
+        #         print(f"抽卡结果: {result}")
             
-            elif button_key == "gain_energy":
-                result = self.battle_controller.process_player_action({"type": "gain_energy"})
-                print(f"获得能量结果: {result}")
+        #     elif button_key == "gain_energy":
+        #         result = self.battle_controller.process_player_action({"type": "gain_energy"})
+        #         print(f"获得能量结果: {result}")
             
-            elif button_key == "attack":
-                result = self.battle_controller.process_player_action({
-                    "type": "attack",
-                    "parameters": {"attack_index": 0}
-                })
-                print(f"攻击结果: {result}")
+        #     elif button_key == "attack":
+        #         result = self.battle_controller.process_player_action({
+        #             "type": "attack",
+        #             "parameters": {"attack_index": 0}
+        #         })
+        #         print(f"攻击结果: {result}")
             
-            elif button_key == "end_turn":
-                result = self.battle_controller.process_player_action({"type": "end_turn"})
-                print(f"结束回合结果: {result}")
+        #     elif button_key == "end_turn":
+        #         result = self.battle_controller.process_player_action({"type": "end_turn"})
+        #         print(f"结束回合结果: {result}")
             
-            elif button_key == "surrender":
-                print("🏳️ 玩家投降")
-                return "back_to_battle_page"
+        #     elif button_key == "surrender":
+        #         print("🏳️ 玩家投降")
+        #         return "back_to_battle_page"
         
         except Exception as e:
             print(f"❌ 处理按钮点击失败: {e}")
     
     def _handle_cardset_clicked(self, event):
         """处理卡牌集合点击事件"""
+        print(f"🃏 卡牌集合点击1: {event}")
         cardset_graphic = event.set
         # 如果图形对象有 cardset 属性，则获取对应的 CardsSet，否则直接使用它
         actual_set = getattr(cardset_graphic, 'cardset', cardset_graphic)
         card = event.card
-        print(f"🎯 卡牌集合点击: {actual_set.name}")  # 使用 CardsSet 的名称
+        print(f"🎯 卡牌集合点击2: {actual_set.name}")  # 使用 CardsSet 的名称
         if card:
             print(f"   点击卡牌: {card.name}")
     
     def _handle_card_moved(self, event):
         """Maneja el evento de mover una carta de un conjunto a otro."""
+        print(f"🔄 卡牌移动: {event}")
         card_adapter = event.card       # PokemonCardAdapter movido
         from_set = event.from_set.cardset
         to_set = event.to_set.cardset
@@ -1048,6 +1252,91 @@ class BattleInterface:
         except Exception as e:
             print(f"❌ Error al procesar movimiento de carta: {e}")
     
+    def _end_turn(self):
+        """结束回合"""
+        print("⏭️ 结束回合")
+        
+        try:
+            # 获取战斗控制器
+            if hasattr(self, 'battle_controller') and self.battle_controller:
+                # 发送结束回合动作
+                action_data = {
+                    "action_type": "end_turn",
+                    "player_id": 1,  # 玩家ID
+                    "timestamp": time.time()
+                }
+                
+                result = self.battle_controller.process_player_action(action_data)
+                
+                if result.get("success"):
+                    print("✅ 回合结束成功")
+                    # 更新界面显示
+                    self._refresh_battle_display()
+                else:
+                    print(f"❌ 结束回合失败: {result.get('error', '未知错误')}")
+                    
+            else:
+                print("❌ 找不到战斗控制器")
+                
+        except Exception as e:
+            print(f"❌ 结束回合异常: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _forfeit_battle(self):
+        """认输"""
+        print("🏳️ 认输")
+        
+        try:
+            # 获取战斗控制器
+            if hasattr(self, 'battle_controller') and self.battle_controller:
+                # 发送认输动作
+                action_data = {
+                    "action_type": "forfeit",
+                    "player_id": 1,  # 玩家ID
+                    "timestamp": time.time()
+                }
+                
+                result = self.battle_controller.process_player_action(action_data)
+                
+                if result.get("success"):
+                    print("✅ 认输成功，战斗结束")
+                    # 返回到战斗页面
+                    if hasattr(self, '_on_battle_ended'):
+                        self._on_battle_ended({"result": "forfeit", "winner": "opponent"})
+                    else:
+                        # 直接返回
+                        return "back_to_battle_page"
+                else:
+                    print(f"❌ 认输失败: {result.get('error', '未知错误')}")
+                    
+            else:
+                print("❌ 找不到战斗控制器")
+                
+        except Exception as e:
+            print(f"❌ 认输异常: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _refresh_battle_display(self):
+        """刷新战斗显示"""
+        try:
+            if hasattr(self, 'battle_controller') and self.battle_controller:
+                # 获取最新战斗状态
+                current_state = self.battle_controller.get_current_state()
+                
+                if current_state.get("success"):
+                    battle_state = current_state.get("state")
+                    if battle_state and hasattr(self, 'cards_manager'):
+                        # 更新卡牌管理器
+                        self.cards_manager.populate_from_state(battle_state)
+                        print("✅ 界面刷新完成")
+                else:
+                    print(f"❌ 获取战斗状态失败: {current_state.get('error')}")
+                    
+        except Exception as e:
+            print(f"❌ 刷新界面异常: {e}")
+
     def update(self, dt):
         """更新界面"""
         # 定期更新战斗状态
