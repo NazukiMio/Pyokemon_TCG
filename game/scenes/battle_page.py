@@ -364,6 +364,15 @@ class BattlePage:
             # 首先显示战斗界面
             print(f"🎨 [battle_page.py] 开始创建战斗界面...")
             self._show_battle_interface_synchronized(battle_id)
+
+            # 🧩 填充 cards_manager 卡组内容
+            if hasattr(self.battle_interface, "cards_manager"):
+                battle_state = self.battle_controller.get_current_state()
+                if battle_state:
+                    self.battle_interface.cards_manager.populate_from_state(battle_state)
+                    print("✅ 已将战斗状态同步到 cards_manager")
+                else:
+                    print("⚠️ 当前 battle_state 不可用，卡牌可能无法渲染")
             
             # 界面创建完成后，通知控制器开始战斗
             if hasattr(self.battle_controller, 'notify_interface_ready'):
@@ -377,6 +386,15 @@ class BattlePage:
             
             # 设置状态
             self.current_state = "battle_interface"
+
+            # 🧼 清理主页面按钮
+            if self.deck_builder_button:
+                self.deck_builder_button.kill()
+                self.deck_builder_button = None
+
+            if self.battle_prep_button:
+                self.battle_prep_button.kill()
+                self.battle_prep_button = None
             
             # 关闭准备窗口
             self._close_prep_windows()

@@ -6,6 +6,7 @@ Pokemon卡片适配器 - 将现有Card类适配为pygamecards格式
 """
 
 import pygame
+# import os
 from functools import cached_property
 from pygame_cards.abstract import AbstractCard, AbstractCardGraphics
 from pygame_cards.set import CardsSet
@@ -13,7 +14,8 @@ from game.core.cards.card_data import Card as PokemonCard
 
 class PokemonCardGraphics(AbstractCardGraphics):
     """Pokemon卡片图形类"""
-    
+    _battle_cache_instance = None  # caché de imágenes compartida
+
     def __init__(self, card: 'PokemonCardAdapter'):
         super().__init__(card)
         self.pokemon_card = card.pokemon_card
@@ -27,60 +29,80 @@ class PokemonCardGraphics(AbstractCardGraphics):
             self.title_font = pygame.font.Font(None, 14)
             self.text_font = pygame.font.Font(None, 10)
             self.number_font = pygame.font.Font(None, 12)
+        
+        
     
     @cached_property
     def surface(self) -> pygame.Surface:
-        """渲染Pokemon卡片"""
-        print(f"🔍 [图形调试] 渲染卡牌: {self.pokemon_card.name}")
-        
-        # 尝试加载真实图片
+        """Renderiza la imagen de la carta Pokémon (usando caché si es posible)."""
+        print(f"🔍 [Gráficos] Renderizando carta: {self.pokemon_card.name}")
         image_loaded = False
         card_image = None
-        
-        if hasattr(self.pokemon_card, 'image_path') and self.pokemon_card.image_path:
-            original_path = self.pokemon_card.image_path
-            print(f"   原始图片路径: {original_path}")
-            
-            # 修复路径：添加card_assets前缀
+
+        if hasattr(PokemonCardAdapter, 'battle_cache'):
+            # 构造图片路径，例如 card_id 为卡牌 ID
+            card_id = self.pokemon_card.id
+            image_path = os.path.join("card_assets", "images", f"{card_id}.png")
+            # 从缓存获取图片表面（若未缓存会自动加载）
+            cached_image = PokemonCardAdapter.battle_cache.get_cached_image(image_path)
+            if cached_image:
+                card_image = cached_image
+                image_loaded = True
+                print(f"   ✅ 从缓存加载图片: {image_path}")
+        # if not image_loaded:
+        #     if card_image is None and os.path.exists(corrected_path):
+        #         card_image = pygame.image.load(corrected_path)
+        #         image_loaded = True
+        #         print(f"   ✅ 图片加载成功: {card_image.get_size()}")
+
+        # Intentar obtener la imagen desde BattleCache si está configurada
+        cache = getattr(PokemonCardAdapter, "_battle_cache_instance", None)
+        if cache and hasattr(self.pokemon_card, "image_path"):
+            # Corregir la ruta igual que antes
             import os
-            if not original_path.startswith('card_assets'):
-                # 确保使用正确的路径分隔符
+            original_path = self.pokemon_card.image_path
+            if original_path and not original_path.startswith('card_assets'):
                 corrected_path = os.path.join('card_assets', original_path.replace('\\', os.sep).replace('/', os.sep))
             else:
                 corrected_path = original_path
-            
-            print(f"   修正后路径: {corrected_path}")
-            
-            # 尝试加载图片
-            try:
-                if os.path.exists(corrected_path):
-                    card_image = pygame.image.load(corrected_path)
-                    print(f"   ✅ 图片加载成功: {card_image.get_size()}")
+            if corrected_path:
+                # Obtener imagen del caché (esto carga y cachea si no estaba cargada)
+                card_image = cache.get_cached_image(corrected_path)
+                if card_image:
                     image_loaded = True
+                    print(f"   ✅ Imagen cargada desde caché: {corrected_path}")
                 else:
-                    print(f"   ❌ 图片文件不存在: {corrected_path}")
+                    print(f"   ❌ Imagen no encontrada en caché: {corrected_path}")
+        # Si no se cargó via caché, intentar cargar del archivo (y se cacheará internamente)
+        if not image_loaded and hasattr(self.pokemon_card, "image_path"):
+            try:
+                import os
+                corrected_path = corrected_path if 'corrected_path' in locals() else self.pokemon_card.image_path
+                if corrected_path and os.path.exists(corrected_path):
+                    card_image = pygame.image.load(corrected_path)
+                    image_loaded = True
+                    print(f"   ✅ Imagen cargada desde archivo: {corrected_path}")
+                    # Opcional: guardar en caché manualmente
+                    if cache:
+                        cache._image_cache[corrected_path] = card_image
+                else:
+                    print(f"   ❌ Archivo de imagen no encontrado: {corrected_path}")
             except Exception as e:
-                print(f"   ❌ 图片加载失败: {e}")
-        
-        # 如果成功加载图片，使用真实图片
+                print(f"   ❌ Falló la carga de imagen: {e}")
+
         if image_loaded and card_image:
-            # 缩放图片到卡片大小
+            # Escalar la imagen al tamaño de la carta
             scaled_image = pygame.transform.scale(card_image, self.size)
             return scaled_image
         else:
-            # 降级到手绘卡片
-            print(f"   🎨 使用手绘卡片")
+            # Fallback: dibujar representación básica si no hay imagen
+            print("   🎨 Usando representación gráfica genérica de la carta")
             surf = pygame.Surface(self.size, pygame.SRCALPHA)
-            
-            # 基础卡片背景
             self._draw_base_card(surf)
-            
-            # 根据卡片类型绘制
             if self.pokemon_card.hp:
                 self._draw_pokemon_card(surf)
             else:
                 self._draw_trainer_card(surf)
-            
             return surf
     
     def _draw_base_card(self, surf):
@@ -271,6 +293,11 @@ class PokemonCardAdapter(AbstractCard):
     
     def __repr__(self):
         return f"PokemonCardAdapter(name='{self.name}', id='{self.instance_id}')"
+    
+    @classmethod
+    def set_battle_cache(cls, cache):
+        """Asocia una instancia de BattleCache para uso de carga de imágenes."""
+        PokemonCardGraphics.set_battle_cache(cache)
 
 
 def convert_to_pokemon_cardsset(cards: list, name: str = "Pokemon Deck") -> CardsSet:

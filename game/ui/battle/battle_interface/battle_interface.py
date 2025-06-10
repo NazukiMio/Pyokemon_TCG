@@ -20,6 +20,21 @@ from pygame_cards import constants
 # 导入我们的适配器
 from .pokemon_card_adapter import PokemonCardAdapter, convert_to_pokemon_cardsset
 
+class PokemonCardsManager(CardsManager):
+    def populate_from_state(self, battle_state):
+        """
+        Pobla las zonas de CardsManager a partir del estado de batalla dado.
+        Crea adaptadores PokemonCardAdapter para cada carta y los asigna a sus zonas.
+        """
+        if not hasattr(self, "interface") or not getattr(self, "interface"):
+            print("⚠️ PokemonCardsManager: no está vinculada a ninguna BattleInterface")
+            return
+        # Delegar en BattleInterface.setup_from_battle_state para la lógica de poblado
+        try:
+            self.interface.setup_from_battle_state(battle_state)
+        except Exception as e:
+            print(f"❌ Error al poblar desde estado: {e}")
+
 class FixedPokemonFieldGraphic(VerticalPileGraphic):
     """修复的Pokemon场地图形类"""
     
@@ -148,11 +163,11 @@ class BattleControlPanel:
         spacing = 10
         
         button_configs = [
-            ("draw_card", "抽卡", (100, 150, 255)),
-            ("gain_energy", "获得能量", (255, 200, 100)),
-            ("attack", "攻击", (255, 100, 100)),
-            ("end_turn", "结束回合", (150, 255, 150)),
-            ("surrender", "投降", (200, 200, 200))
+            ("draw_card", "Robar carta", (100, 150, 255)),
+            ("gain_energy", "Ganar energía", (255, 200, 100)),
+            ("attack", "Atacar", (255, 100, 100)),
+            ("end_turn", "Terminar turno", (150, 255, 150)),
+            ("surrender", "Rendirse", (200, 200, 200))
         ]
         
         for i, (key, text, color) in enumerate(button_configs):
@@ -214,7 +229,7 @@ class BattleControlPanel:
         screen.blit(panel_surf, self.panel_rect)
         
         # 标题
-        title = "控制面板"
+        title = "Panel de control"
         title_surface = self.title_font.render(title, True, (255, 255, 255))
         title_rect = title_surface.get_rect(centerx=self.panel_rect.centerx, y=self.panel_rect.y + 10)
         screen.blit(title_surface, title_rect)
@@ -225,13 +240,13 @@ class BattleControlPanel:
             
             # 当前阶段
             phase = battle_state.current_phase.value if hasattr(battle_state.current_phase, 'value') else str(battle_state.current_phase)
-            phase_text = f"阶段: {phase}"
+            phase_text = f"Fase: {phase}"
             phase_surface = self.info_font.render(phase_text, True, (200, 200, 200))
             screen.blit(phase_surface, (self.panel_rect.x + 10, info_y))
             
             # 当前玩家
-            current_player = "你" if battle_state.current_turn_player == 1 else "AI"
-            player_text = f"当前: {current_player}"
+            current_player = "Usted" if battle_state.current_turn_player == 1 else "AI"
+            player_text = f"Turno: {current_player}"
             player_surface = self.info_font.render(player_text, True, (200, 200, 200))
             screen.blit(player_surface, (self.panel_rect.x + 10, info_y + 15))
         
@@ -240,10 +255,10 @@ class BattleControlPanel:
             info_y = self.panel_rect.y + 350
             
             stats = [
-                f"能量: {player_state.energy_points}",
-                f"手牌: {len(player_state.hand)}",
-                f"卡组: {len(player_state.deck)}",
-                f"奖励: {player_state.prize_cards_taken}/3"
+                f"Energía: {player_state.energy_points}",
+                f"Mano: {len(player_state.hand)}",
+                f"Mazo: {len(player_state.deck)}",
+                f"Premio: {player_state.prize_cards_taken}/3"
             ]
             
             for i, stat in enumerate(stats):
@@ -290,49 +305,49 @@ class FixedPokemonBattleBoard(GameBoard):
         """设置卡牌区域"""
         # 我方区域
         self.player_hand = CardsSet([])
-        self.player_hand.name = "Player Hand"
+        self.player_hand.name = "Mano Jugador"
         
         self.player_deck = CardsSet([])
-        self.player_deck.name = "Player Deck"
+        self.player_deck.name = "Mazo Jugador"
         
         self.player_discard = CardsSet([])
-        self.player_discard.name = "Player Discard"
+        self.player_discard.name = "Descartes Jugador"
         
         self.player_active = CardsSet([])
-        self.player_active.name = "Player Active"
+        self.player_active.name = "Activo Jugador"
         
         # 我方备战区
         self.player_bench_1 = CardsSet([])
-        self.player_bench_1.name = "Player Bench 1"
+        self.player_bench_1.name = "Banca Jucador 1"
         
         self.player_bench_2 = CardsSet([])
-        self.player_bench_2.name = "Player Bench 2"
+        self.player_bench_2.name = "Banca Jucador 2"
         
         self.player_bench_3 = CardsSet([])
-        self.player_bench_3.name = "Player Bench 3"
+        self.player_bench_3.name = "Banca Jucador 3"
         
         # 对手区域
         self.opponent_hand = CardsSet([])
-        self.opponent_hand.name = "Opponent Hand"
+        self.opponent_hand.name = "Mano Rival"
         
         self.opponent_deck = CardsSet([])
-        self.opponent_deck.name = "Opponent Deck"
+        self.opponent_deck.name = "Mazo Rival"
         
         self.opponent_discard = CardsSet([])
-        self.opponent_discard.name = "Opponent Discard"
+        self.opponent_discard.name = "Descartes Rival"
         
         self.opponent_active = CardsSet([])
-        self.opponent_active.name = "Opponent Active"
+        self.opponent_active.name = "Activo Rival"
         
         # 对手备战区
         self.opponent_bench_1 = CardsSet([])
-        self.opponent_bench_1.name = "Opponent Bench 1"
+        self.opponent_bench_1.name = "Banca Enemiga 1"
         
         self.opponent_bench_2 = CardsSet([])
-        self.opponent_bench_2.name = "Opponent Bench 2"
+        self.opponent_bench_2.name = "Banca Enemiga 2"
         
         self.opponent_bench_3 = CardsSet([])
-        self.opponent_bench_3.name = "Opponent Bench 3"
+        self.opponent_bench_3.name = "Banca Enemiga 3"
         
         # 添加到游戏板
         self.cardsets = [
@@ -406,6 +421,8 @@ class BattleInterface:
         self.screen_height = screen_height
         self.battle_controller = battle_controller
         self.battle_cache = battle_cache
+        if self.battle_cache:
+            PokemonCardAdapter.set_battle_cache(self.battle_cache)
         
         # 等待战斗控制器准备完成
         self._wait_for_battle_ready()
@@ -414,11 +431,18 @@ class BattleInterface:
         self.background_image = None
         self._load_background()
         
+        # 如果提供了 battle_cache，则预加载当前战斗的卡牌图片
+        if self.battle_cache:
+            self.battle_cache.preload_cards_from_battle(self.battle_controller)
+
         # 创建游戏板
         self.game_board = FixedPokemonBattleBoard(screen_width, screen_height)
         
         # 创建卡牌管理器
-        self.cards_manager = CardsManager(click_time=200)
+        self.cards_manager = PokemonCardsManager(click_time=200)
+
+        # Vincular la instancia de CardsManager con la interfaz para acceso al método de poblado
+        self.cards_manager.interface = self
         
         # 创建控制面板
         self.control_panel = BattleControlPanel(screen_width, screen_height)
@@ -432,7 +456,7 @@ class BattleInterface:
         # 状态
         self.battle_state = None
         self.last_update_time = 0
-        
+
         # 字体
         try:
             self.title_font = pygame.font.SysFont("arial", 24, bold=True)
@@ -526,51 +550,51 @@ class BattleInterface:
         # 战斗位
         self.game_board.player_active.graphics = FixedPokemonFieldGraphic(
             self.game_board.player_active,
-            title="Active",
+            title="Activo",
             is_enemy=False
         )
         
         self.game_board.opponent_active.graphics = FixedPokemonFieldGraphic(
             self.game_board.opponent_active,
-            title="Enemy Active",
+            title="Activo Enemigo",
             is_enemy=True
         )
         
         # 我方备战区
         self.game_board.player_bench_1.graphics = FixedPokemonFieldGraphic(
             self.game_board.player_bench_1,
-            title="Bench 1",
+            title="Banca 1",
             is_enemy=False
         )
         
         self.game_board.player_bench_2.graphics = FixedPokemonFieldGraphic(
             self.game_board.player_bench_2,
-            title="Bench 2",
+            title="Banca 2",
             is_enemy=False
         )
         
         self.game_board.player_bench_3.graphics = FixedPokemonFieldGraphic(
             self.game_board.player_bench_3,
-            title="Bench 3",
+            title="Banca 3",
             is_enemy=False
         )
         
         # 对手备战区
         self.game_board.opponent_bench_1.graphics = FixedPokemonFieldGraphic(
             self.game_board.opponent_bench_1,
-            title="Enemy Bench 1",
+            title="Banca Enemiga 1",
             is_enemy=True
         )
         
         self.game_board.opponent_bench_2.graphics = FixedPokemonFieldGraphic(
             self.game_board.opponent_bench_2,
-            title="Enemy Bench 2",
+            title="Banca Enemiga 2",
             is_enemy=True
         )
         
         self.game_board.opponent_bench_3.graphics = FixedPokemonFieldGraphic(
             self.game_board.opponent_bench_3,
-            title="Enemy Bench 3",
+            title="Banca Enemiga 3",
             is_enemy=True
         )
     
@@ -674,11 +698,11 @@ class BattleInterface:
             
             if player_state:
                 # 更新手牌
-                self._safe_update_cardset(self.game_board.player_hand, player_state.hand, "Player Hand")
+                self._safe_update_cardset(self.game_board.player_hand, player_state.hand, "Mano Jugador")
                 
                 # 更新前排Pokemon
                 if player_state.active_pokemon:
-                    self._safe_update_cardset(self.game_board.player_active, [player_state.active_pokemon], "Player Active")
+                    self._safe_update_cardset(self.game_board.player_active, [player_state.active_pokemon], "Activo Jugador")
                 else:
                     self.game_board.player_active.clear()
                 
@@ -693,7 +717,7 @@ class BattleInterface:
                 for i, bench_area in enumerate(bench_areas):
                     bench_area.clear()
                     if i < len(bench_pokemon) and bench_pokemon[i] is not None:
-                        self._safe_update_cardset(bench_areas[i], [bench_pokemon[i]], f"Player Bench {i+1}")
+                        self._safe_update_cardset(bench_areas[i], [bench_pokemon[i]], f"Banca Jucador {i+1}")
                 
                 # 更新卡组显示（显示卡背）
                 self._update_deck_display(self.game_board.player_deck, len(player_state.deck))
@@ -704,7 +728,7 @@ class BattleInterface:
                 
                 # 更新AI前排
                 if ai_state.active_pokemon:
-                    self._safe_update_cardset(self.game_board.opponent_active, [ai_state.active_pokemon], "Opponent Active")
+                    self._safe_update_cardset(self.game_board.opponent_active, [ai_state.active_pokemon], "Activo Rival")
                 else:
                     self.game_board.opponent_active.clear()
                 
@@ -719,19 +743,157 @@ class BattleInterface:
                 for i, bench_area in enumerate(ai_bench_areas):
                     bench_area.clear()
                     if i < len(ai_bench_pokemon) and ai_bench_pokemon[i] is not None:
-                        self._safe_update_cardset(ai_bench_areas[i], [ai_bench_pokemon[i]], f"Opponent Bench {i+1}")
+                        self._safe_update_cardset(ai_bench_areas[i], [ai_bench_pokemon[i]], f"Banca Enemiga {i+1}")
                 
                 # 更新AI卡组显示
                 self._update_deck_display(self.game_board.opponent_deck, len(ai_state.deck))
             
             # 更新控制面板
             self.control_panel.update_button_states(self.battle_state, player_state)
+
+            # populate 管理
+            self.cards_manager.populate_from_state(self.battle_state)
             
         except Exception as e:
             print(f"❌ 更新战斗状态失败: {e}")
             import traceback
             traceback.print_exc()
     
+    def setup_from_battle_state(self, battle_state):
+        """
+        Configura la interfaz según el estado de batalla proporcionado.
+        Agrega las cartas correspondientes a cada zona visual.
+        """
+        # Obtener el gestor de batalla y estados de jugadores
+        if hasattr(battle_state, "get_player_state"):
+            battle_manager = battle_state
+        elif hasattr(battle_state, "current_battle"):
+            battle_manager = battle_state.current_battle
+        else:
+            print("⚠️ battle_state no contiene información de batalla válida")
+            return
+
+        player_state = battle_manager.get_player_state(1)
+        opponent_state = battle_manager.get_player_state(999)
+
+        # Limpiar todas las zonas antes de poblar
+        # Mano del jugador
+        self.game_board.player_hand.clear()
+        if player_state and player_state.hand:
+            # Convertir las cartas de la mano a adaptadores PokemonCardAdapter
+            player_hand_cards = convert_to_pokemon_cardsset(player_state.hand, "Mano Jugador")
+            self.game_board.player_hand.extend(player_hand_cards)
+            if hasattr(self.game_board.player_hand, "graphics"):
+                self.game_board.player_hand.graphics.clear_cache()
+
+        # Zona Activa del jugador
+        self.game_board.player_active.clear()
+        if player_state and player_state.active_pokemon:
+            active_cardset = convert_to_pokemon_cardsset([player_state.active_pokemon], "Activo Jugador")
+            self.game_board.player_active.extend(active_cardset)
+            if hasattr(self.game_board.player_active, "graphics"):
+                self.game_board.player_active.graphics.clear_cache()
+
+        # Zonas de Banca del jugador (hasta 3 Pokémon)
+        bench_areas = [
+            self.game_board.player_bench_1,
+            self.game_board.player_bench_2,
+            self.game_board.player_bench_3
+        ]
+        # Limpiar primero todas las bancas
+        for area in bench_areas:
+            area.clear()
+        if player_state:
+            bench_pokemon = player_state.bench_pokemon if hasattr(player_state, "bench_pokemon") else []
+            for i, pokemon in enumerate(bench_pokemon[:3]):  # máx. 3 en banca
+                if i < len(bench_areas) and pokemon is not None:
+                    bench_slot_cardset = convert_to_pokemon_cardsset([pokemon], f"Banca Jucador {i+1}")
+                    bench_areas[i].extend(bench_slot_cardset)
+                    if hasattr(bench_areas[i], "graphics"):
+                        bench_areas[i].graphics.clear_cache()
+
+        # Pila de descarte del jugador
+        self.game_board.player_discard.clear()
+        if player_state and hasattr(player_state, "discard_pile"):
+            discard_cards = player_state.discard_pile
+        elif player_state and hasattr(player_state, "discard"):
+            discard_cards = player_state.discard  # si la propiedad se llama así
+        else:
+            discard_cards = []
+        if discard_cards:
+            discard_cardset = convert_to_pokemon_cardsset(discard_cards, "Descartes Jugador")
+            self.game_board.player_discard.extend(discard_cardset)
+            if hasattr(self.game_board.player_discard, "graphics"):
+                self.game_board.player_discard.graphics.clear_cache()
+
+        # Mano del oponente (mostrar solo dorso)
+        self.game_board.opponent_hand.clear()
+        if opponent_state and opponent_state.hand and len(opponent_state.hand) > 0:
+            # Crear carta dummy de dorso para representar la mano del oponente
+            from game.core.cards.card_data import Card
+            dummy_card = Card(id="card_back", name="Dorso de carta", rarity="Common", types=[])
+            dummy_adapter = PokemonCardAdapter(dummy_card, instance_id="opponent_hand_back")
+            self.game_board.opponent_hand.append(dummy_adapter)
+            if hasattr(self.game_board.opponent_hand, "graphics"):
+                self.game_board.opponent_hand.graphics.clear_cache()
+
+        # Zona Activa del oponente
+        self.game_board.opponent_active.clear()
+        if opponent_state and opponent_state.active_pokemon:
+            opp_active_cardset = convert_to_pokemon_cardsset([opponent_state.active_pokemon], "Activo Rival")
+            self.game_board.opponent_active.extend(opp_active_cardset)
+            if hasattr(self.game_board.opponent_active, "graphics"):
+                self.game_board.opponent_active.graphics.clear_cache()
+
+        # Zonas de Banca del oponente
+        opp_bench_areas = [
+            self.game_board.opponent_bench_1,
+            self.game_board.opponent_bench_2,
+            self.game_board.opponent_bench_3
+        ]
+        for area in opp_bench_areas:
+            area.clear()
+        if opponent_state:
+            opp_bench_pokemon = opponent_state.bench_pokemon if hasattr(opponent_state, "bench_pokemon") else []
+            for i, pokemon in enumerate(opp_bench_pokemon[:3]):  # máx. 3 en banca
+                if i < len(opp_bench_areas) and pokemon is not None:
+                    opp_bench_cardset = convert_to_pokemon_cardsset([pokemon], f"Banca Enemiga {i+1}")
+                    opp_bench_areas[i].extend(opp_bench_cardset)
+                    if hasattr(opp_bench_areas[i], "graphics"):
+                        opp_bench_areas[i].graphics.clear_cache()
+
+        # Pila de descarte del oponente (si se necesita, similar a la del jugador)
+        self.game_board.opponent_discard.clear()
+        # (Se puede poblar si hay cartas en la pila de descarte del oponente)
+
+        # Mazo del jugador (dorso de carta)
+        self.game_board.player_deck.clear()
+        if player_state:
+            deck_count = len(player_state.deck) if hasattr(player_state, "deck") else 0
+        else:
+            deck_count = 0
+        if deck_count > 0:
+            from game.core.cards.card_data import Card
+            dummy_card = Card(id="card_back", name="Dorso de carta", rarity="Common", types=[])
+            dummy_adapter = PokemonCardAdapter(dummy_card, instance_id="player_deck_back")
+            self.game_board.player_deck.append(dummy_adapter)
+            if hasattr(self.game_board.player_deck, "graphics"):
+                self.game_board.player_deck.graphics.clear_cache()
+
+        # Mazo del oponente (dorso de carta)
+        self.game_board.opponent_deck.clear()
+        if opponent_state:
+            opp_deck_count = len(opponent_state.deck) if hasattr(opponent_state, "deck") else 0
+        else:
+            opp_deck_count = 0
+        if opp_deck_count > 0:
+            from game.core.cards.card_data import Card
+            dummy_card = Card(id="card_back", name="Dorso de carta", rarity="Common", types=[])
+            dummy_adapter = PokemonCardAdapter(dummy_card, instance_id="opponent_deck_back")
+            self.game_board.opponent_deck.append(dummy_adapter)
+            if hasattr(self.game_board.opponent_deck, "graphics"):
+                self.game_board.opponent_deck.graphics.clear_cache()
+
     def _safe_update_cardset(self, cardset: CardsSet, cards_data, name: str):
         """安全地更新卡牌集合"""
         try:
@@ -790,6 +952,10 @@ class BattleInterface:
                 print("🔙 ESC键按下，返回战斗页面")
                 return "back_to_battle_page"
         
+        # 处理 pygame_gui 按钮事件（💡 必须加这句！）
+        if self.cards_manager and self.cards_manager.ui_manager:
+            self.cards_manager.ui_manager.process_events(event)
+
         # 处理控制面板点击
         if event.type == pygame.MOUSEBUTTONDOWN:
             button_clicked = self.control_panel.handle_click(event.pos)
@@ -844,22 +1010,43 @@ class BattleInterface:
     
     def _handle_cardset_clicked(self, event):
         """处理卡牌集合点击事件"""
-        cardset = event.set
+        cardset_graphic = event.set
+        # 如果图形对象有 cardset 属性，则获取对应的 CardsSet，否则直接使用它
+        actual_set = getattr(cardset_graphic, 'cardset', cardset_graphic)
         card = event.card
-        
-        print(f"🎯 卡牌集合点击: {cardset.name}")
+        print(f"🎯 卡牌集合点击: {actual_set.name}")  # 使用 CardsSet 的名称
         if card:
             print(f"   点击卡牌: {card.name}")
     
     def _handle_card_moved(self, event):
-        """处理卡牌移动事件"""
-        card = event.card
-        from_set = event.from_set
-        to_set = event.to_set
-        
-        print(f"🚚 卡牌移动: {card.name}")
-        print(f"   从: {from_set.cardset.name}")
-        print(f"   到: {to_set.cardset.name}")
+        """Maneja el evento de mover una carta de un conjunto a otro."""
+        card_adapter = event.card       # PokemonCardAdapter movido
+        from_set = event.from_set.cardset
+        to_set = event.to_set.cardset
+        print(f"🚚 Carta movida: {card_adapter.name}")
+        print(f"   Desde: {from_set.name} -> Hasta: {to_set.name}")
+
+        # Si no hay controlador de batalla, no hacer nada
+        if not self.battle_controller:
+            return
+
+        try:
+            # Si la carta proviene de la mano del jugador y es un Pokémon que se jugó a la zona activa o banca
+            if from_set == self.game_board.player_hand and hasattr(card_adapter, "is_pokemon") and card_adapter.is_pokemon():
+                if to_set in [self.game_board.player_active, self.game_board.player_bench_1, self.game_board.player_bench_2, self.game_board.player_bench_3]:
+                    # Enviar acción de jugar Pokémon
+                    action_data = {"type": "play_pokemon", "source_id": getattr(card_adapter, "instance_id", None)}
+                    result = self.battle_controller.process_player_action(action_data)
+                    print(f"▶️ Resultado de jugar Pokémon: {result}")
+            # Si la carta es un Entrenador y se movió a la pila de descarte (usarla)
+            if from_set == self.game_board.player_hand and hasattr(card_adapter, "is_trainer") and card_adapter.is_trainer():
+                if to_set == self.game_board.player_discard:
+                    # (En una versión completa, aquí se podría procesar la acción de entrenador)
+                    print(f"▶️ Carta de Entrenador usada: {card_adapter.name}")
+            # Actualizar estado visual después de la acción
+            self._update_battle_state()
+        except Exception as e:
+            print(f"❌ Error al procesar movimiento de carta: {e}")
     
     def update(self, dt):
         """更新界面"""
@@ -881,7 +1068,7 @@ class BattleInterface:
             screen.fill((76, 175, 80))
         
         # 绘制标题
-        title = "Pokemon TCG Battle - Fixed Version"
+        title = "Batalla Pokémon TCG"
         title_surface = self.title_font.render(title, True, (255, 255, 255))
         title_rect = title_surface.get_rect(centerx=self.game_board.game_area_width//2, y=10)
         screen.blit(title_surface, title_rect)
@@ -892,10 +1079,10 @@ class BattleInterface:
                         (50, center_y), (self.game_board.game_area_width-50, center_y), 2)
         
         # 标记玩家和对手区域
-        player_label = self.info_font.render("PLAYER", True, (100, 255, 100))
+        player_label = self.info_font.render("JUGADOR", True, (100, 255, 100))
         screen.blit(player_label, (10, center_y + 10))
         
-        opponent_label = self.info_font.render("OPPONENT", True, (255, 100, 100))
+        opponent_label = self.info_font.render("OPONENTE", True, (255, 100, 100))
         screen.blit(opponent_label, (10, center_y - 30))
         
         # 绘制卡牌管理器
@@ -909,7 +1096,7 @@ class BattleInterface:
         self.control_panel.draw(screen, self.battle_state, player_state, opponent_state)
         
         # 操作提示
-        hint = "Drag cards to play | Click buttons to act | ESC to exit"
+        hint = "Arrastra las cartas para jugar | Haz clic en los botones para actuar | ESC para salir"
         hint_surface = self.small_font.render(hint, True, (150, 150, 150))
         hint_rect = hint_surface.get_rect(centerx=self.game_board.game_area_width//2, y=self.screen_height-20)
         screen.blit(hint_surface, hint_rect)

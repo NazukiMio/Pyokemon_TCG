@@ -104,7 +104,7 @@ class BattleCardRenderer:
             pygame.draw.rect(surface, (80, 80, 80), image_rect)
             
             # "无图片"文字
-            no_img_text = self.info_font.render("No Image", True, (200, 200, 200))
+            no_img_text = self.info_font.render("Sin imagen", True, (200, 200, 200))
             text_rect = no_img_text.get_rect(center=image_rect.center)
             surface.blit(no_img_text, text_rect)
     
