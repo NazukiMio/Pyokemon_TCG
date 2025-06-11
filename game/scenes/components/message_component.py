@@ -5,14 +5,13 @@
 
 import pygame
 import time
-from game.scenes.styles.theme import Theme
-from game.scenes.styles import fonts
+from ..styles.theme import Theme
+from ..styles.fonts import font_manager
 
 class MessageManager:
     """消息管理器，处理各种消息提示"""
     
     def __init__(self):
-        fonts.font_manager = fonts.FontManager()
         self.messages = []
     
     def show_message(self, text, message_type="info", duration=3000, position="center"):
@@ -110,7 +109,7 @@ class MessageManager:
         color = self._get_message_color(message['type'])
         
         # 渲染文本
-        text_surface = fonts.font_manager.render_text(
+        text_surface = font_manager.render_text(
             message['text'], 'md', screen_height, color
         )
         
@@ -173,7 +172,7 @@ class MessageManager:
     
     def _get_message_height(self, message, screen_height, scale_factor):
         """获取消息的高度"""
-        text_height = fonts.font_manager.get_text_size(message['text'], 'md', screen_height)[1]
+        text_height = font_manager.get_text_size(message['text'], 'md', screen_height)[1]
         padding = Theme.get_scaled_size('spacing_md', scale_factor)
         return text_height + padding * 2
     
@@ -253,7 +252,7 @@ class ToastMessage:
             color = Theme.get_color('info')
         
         # 渲染文本
-        text_surface = fonts.font_manager.render_text(
+        text_surface = font_manager.render_text(
             self.text, 'md', screen_height, color
         )
         

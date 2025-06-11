@@ -105,13 +105,13 @@ class GameLauncher:
             # 显示加载文本
             loading_text = "Cargando..."
             text_color = Theme.get_color('text')
-            text_surface = fonts.font_manager.render_text(loading_text, 'xl', height, text_color)
+            text_surface = font_manager.render_text(loading_text, 'xl', height, text_color)
             text_rect = text_surface.get_rect(center=(width // 2, height // 2))
             self.screen.blit(text_surface, text_rect)
             
             # 显示版本信息
             version_text = "Pygame Edition v1.0"
-            version_surface = fonts.font_manager.render_text(version_text, 'md', height, text_color)
+            version_surface = font_manager.render_text(version_text, 'md', height, text_color)
             version_rect = version_surface.get_rect(center=(width // 2, height // 2 + 60))
             self.screen.blit(version_surface, version_rect)
             
@@ -208,27 +208,27 @@ class GameLauncher:
             # 显示成功信息
             success_text = "¡Inicio de sesión exitoso!"
             text_color = Theme.get_color('success')
-            text_surface = fonts.font_manager.render_text(success_text, 'xl', height, text_color)
+            text_surface = font_manager.render_text(success_text, 'xl', height, text_color)
             text_rect = text_surface.get_rect(center=(width // 2, height // 2 - 50))
             self.screen.blit(text_surface, text_rect)
             
             # 显示用户ID
             user_text = f"Usuario ID: {user_id}"
             user_color = Theme.get_color('text')
-            user_surface = fonts.font_manager.render_text(user_text, 'lg', height, user_color)
+            user_surface = font_manager.render_text(user_text, 'lg', height, user_color)
             user_rect = user_surface.get_rect(center=(width // 2, height // 2))
             self.screen.blit(user_surface, user_rect)
             
             # 显示提示
             hint_text = "Presiona ESC para salir"
             hint_color = Theme.get_color('text_secondary')
-            hint_surface = fonts.font_manager.render_text(hint_text, 'md', height, hint_color)
+            hint_surface = font_manager.render_text(hint_text, 'md', height, hint_color)
             hint_rect = hint_surface.get_rect(center=(width // 2, height // 2 + 100))
             self.screen.blit(hint_surface, hint_rect)
             
             # 显示游戏接口提示
             game_text = "Aquí se cargará la interfaz principal del juego"
-            game_surface = fonts.font_manager.render_text(game_text, 'md', height, hint_color)
+            game_surface = font_manager.render_text(game_text, 'md', height, hint_color)
             game_rect = game_surface.get_rect(center=(width // 2, height // 2 + 150))
             self.screen.blit(game_surface, game_rect)
             
@@ -278,7 +278,7 @@ class GameLauncher:
             print("🧹 清理游戏资源...")
             
             # 清理字体缓存
-            fonts.font_manager.clear_cache()
+            font_manager.clear_cache()
             
             # 退出pygame
             pygame.quit()

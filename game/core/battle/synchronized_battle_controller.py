@@ -19,7 +19,7 @@ class SynchronizedBattleController(BattleController):
         self.interface_ready = False
         
     def start_new_battle_with_sync(self, player_deck_id: int, opponent_type: str = "AI", 
-                                opponent_difficulty: str = "rookie_trainer") -> Dict[str, Any]:
+                                 opponent_difficulty: str = "rookie_trainer") -> Dict[str, Any]:
         """
         同步启动新战斗 - 分两个阶段
         1. 准备战斗但不开始
@@ -62,10 +62,6 @@ class SynchronizedBattleController(BattleController):
             self.battle_prepared = True
             print(f"✅ [同步控制器] 战斗准备完成，等待界面...")
             
-            # ❌ 重要：移除立即开始战斗的代码
-            # 不要在这里调用 switch_phase("draw") 或任何开始战斗的方法
-            # 战斗开始应该在 on_interface_ready() 中进行
-            
             return {
                 "success": True,
                 "battle_id": self.current_battle.battle_state.battle_id,
@@ -79,41 +75,6 @@ class SynchronizedBattleController(BattleController):
             traceback.print_exc()
             return {"success": False, "error": f"准备战斗异常: {str(e)}"}
     
-    def on_interface_ready(self):
-        """界面准备完成回调"""
-        print("🎮 [同步控制器] 界面准备完成，开始战斗...")
-        
-        if not self.battle_prepared:
-            print("❌ [同步控制器] 战斗尚未准备")
-            return
-        
-        if not self.current_battle:
-            print("❌ [同步控制器] 没有活跃的战斗")
-            return
-        
-        try:
-            # ✅ 现在才真正开始战斗
-            print("🚀 战斗开始!")
-            print(f"   玩家 {self.current_battle.player1_id} vs AI")
-            
-            # 切换到抽牌阶段
-            if hasattr(self.current_battle, 'switch_phase'):
-                self.current_battle.switch_phase("draw")
-                print("🔄 阶段切换: draw")
-            elif hasattr(self.current_battle, 'start_battle'):
-                self.current_battle.start_battle()
-                print("🔄 调用start_battle")
-            else:
-                print("⚠️ 找不到开始战斗的方法")
-            
-            self.interface_ready = True
-            print("✅ [同步控制器] 战斗成功启动")
-            
-        except Exception as e:
-            print(f"❌ [同步控制器] 战斗启动失败: {e}")
-            import traceback
-            traceback.print_exc()
-
     def notify_interface_ready(self) -> Dict[str, Any]:
         """
         通知界面准备完成，开始战斗
@@ -164,7 +125,7 @@ class SynchronizedBattleController(BattleController):
                 "success": True,
                 "battle_id": battle_state.battle_id,
                 "current_player": battle_state.current_turn_player,
-                "phase": battle_state.current_phase.value if hasattr(battle_state.current_phase, 'value') else str(battle_state.current_phase),
+                "phase": battle_state.current_phase.value,
                 "turn": battle_state.turn_count,
                 "player_state": {
                     "hand_count": len(player_state.hand) if player_state else 0,
@@ -196,27 +157,6 @@ class SynchronizedBattleController(BattleController):
         """重置同步状态"""
         self.battle_prepared = False
         self.interface_ready = False
-        print("🔄 [同步控制器] 同步状态已重置")
-
-    def is_ready_for_interface(self) -> bool:
-        """检查是否准备好创建界面"""
-        return self.battle_prepared and self.current_battle is not None
-    
-    def wait_for_interface_sync(self) -> bool:
-        """等待界面同步完成"""
-        # 这里可以添加超时逻辑
-        import time
-        timeout = 5.0  # 5秒超时
-        start_time = time.time()
-        
-        while not self.interface_ready:
-            if time.time() - start_time > timeout:
-                print("⏰ [同步控制器] 等待界面同步超时")
-                return False
-            
-            time.sleep(0.1)  # 短暂等待
-        
-        return True
         
     def end_battle(self) -> Dict[str, Any]:
         """结束战斗并重置同步状态"""

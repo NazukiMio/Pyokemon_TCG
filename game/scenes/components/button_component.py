@@ -4,8 +4,8 @@
 """
 
 import pygame
-from game.scenes.styles.theme import Theme
-from game.scenes.styles import fonts
+from ..styles.theme import Theme
+from ..styles.fonts import font_manager
 
 class ModernButton:
     """现代毛玻璃风格按钮组件"""
@@ -21,7 +21,6 @@ class ModernButton:
             button_type: 按钮类型 ("primary", "secondary", "text")
             font_size: 字体大小名称
         """
-        fonts.font_manager = fonts.FontManager()
         self.rect = rect
         self.text = text
         self.icon = icon
@@ -245,7 +244,7 @@ class ModernButton:
         text_color = Theme.get_color('accent_hover') if self.is_hover else Theme.get_color('accent')
         
         # 渲染文本
-        text_surface = fonts.font_manager.render_text(
+        text_surface = font_manager.render_text(
             self.text, self.font_size, screen_height, text_color
         )
         text_rect = text_surface.get_rect(center=rect.center)
@@ -270,7 +269,7 @@ class ModernButton:
         
         # 绘制图标
         if self.icon:
-            icon_font = fonts.font_manager.get_font_by_size(int(24 * scale_factor))
+            icon_font = font_manager.get_font_by_size(int(24 * scale_factor))
             icon_surface = icon_font.render(self.icon, True, icon_color)
             icon_rect = icon_surface.get_rect(
                 center=(rect.centerx, rect.centery - int(12 * scale_factor))
@@ -278,7 +277,7 @@ class ModernButton:
             screen.blit(icon_surface, icon_rect)
         
         # 绘制文字
-        text_surface = fonts.font_manager.render_text(
+        text_surface = font_manager.render_text(
             self.text, self.font_size, screen_height, text_color
         )
         text_rect = text_surface.get_rect(
