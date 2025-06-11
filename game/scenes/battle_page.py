@@ -207,6 +207,10 @@ class BattlePage:
     def handle_event(self, event) -> Optional[str]:
         """处理事件"""
         try:
+            # ✅ 首先处理pygame_gui事件（在BattlePage层级）
+            if hasattr(self, 'ui_manager') and self.ui_manager:
+                self.ui_manager.process_events(event)
+            
             # 🆕 如果在战斗界面状态
             if self.current_state == "battle_interface" and self.battle_interface:
                 result = self.battle_interface.handle_event(event)
@@ -230,6 +234,11 @@ class BattlePage:
             
             elif event.type == pygame.MOUSEMOTION:
                 self._handle_mouse_motion(event.pos)
+
+            if event.type == pygame.USEREVENT:
+                if hasattr(event, 'user_type'):
+                    if event.user_type == pygame_gui.UI_BUTTON_PRESSED:
+                        self._handle_button_event(event)
             
             return None
             
@@ -351,46 +360,139 @@ class BattlePage:
                 import traceback
                 traceback.print_exc()
     
-    def _on_battle_started_synchronized(self, battle_info: dict):
-        """处理同步战斗开始回调"""
-        print(f"🎮 [battle_page.py] 同步战斗开始回调: {battle_info}")
+# 在 _on_battle_started_synchronized 方法中修复
+
+    def _on_battle_started_synchronized(self, battle_data):
+        """同步战斗开始回调处理"""
+        print(f"🎮 [battle_page.py] 同步战斗开始回调: {battle_data}")
         
         try:
-            battle_id = battle_info.get('battle_id')
-            if not battle_id:
-                print(f"❌ [battle_page.py] 战斗ID缺失")
-                return
+            self._create_battle_interface()
             
-            # 首先显示战斗界面
-            print(f"🎨 [battle_page.py] 开始创建战斗界面...")
-            self._show_battle_interface_synchronized(battle_id)
-            
-            # 界面创建完成后，通知控制器开始战斗
-            if hasattr(self.battle_controller, 'notify_interface_ready'):
-                print(f"📡 [battle_page.py] 通知战斗控制器界面准备完成...")
-                result = self.battle_controller.notify_interface_ready()
+            battle_id = battle_data.get('battle_id')
+            if battle_id:
+                print(f"🎮 [battle_page.py] 开始显示同步战斗界面: {battle_id}")
+                self._show_battle_interface_synchronized(battle_id)
                 
-                if result.get('success'):
-                    print(f"✅ [battle_page.py] 战斗同步启动成功")
-                else:
-                    print(f"❌ [battle_page.py] 战斗同步启动失败: {result.get('error')}")
-            
-            # 设置状态
-            self.current_state = "battle_interface"
-            
-            # 关闭准备窗口
-            self._close_prep_windows()
-            
-            # 通知父组件
-            if hasattr(self, 'on_battle_started') and self.on_battle_started:
-                self.on_battle_started(battle_id)
-            
-            print(f"✅ [battle_page.py] 同步战斗界面显示完成")
-            
+                # ✅ 重要：等待界面完全初始化
+                self._wait_for_interface_ready()
+                
+            else:
+                print("❌ [battle_page.py] 未找到battle_id")
+                
         except Exception as e:
-            print(f"❌ [battle_page.py] 同步战斗开始处理失败: {e}")
+            print(f"❌ [battle_page.py] 同步战斗开始回调异常: {e}")
             import traceback
             traceback.print_exc()
+
+    def _create_battle_interface(self):
+        """创建战斗界面"""
+        print("🎮 [battle_page.py] 创建战斗界面...")
+        
+        try:
+            # 检查必要的依赖
+            if not self.battle_controller:
+                print("❌ [battle_page.py] 战斗控制器未初始化")
+                return False
+                
+            # 清理之前的界面
+            if self.battle_interface:
+                if hasattr(self.battle_interface, 'cleanup'):
+                    self.battle_interface.cleanup()
+                self.battle_interface = None
+                print("🧹 [battle_page.py] 清理之前的战斗界面")
+            
+            # 导入BattleInterface类
+            from game.ui.battle.battle_interface.battle_interface import BattleInterface
+            
+            # 创建新的战斗界面实例
+            self.battle_interface = BattleInterface(
+                screen_width=self.screen_width,
+                screen_height=self.screen_height,
+                battle_controller=self.battle_controller
+            )
+            
+            # 初始化战斗缓存
+            if hasattr(self, 'game_manager') and self.game_manager:
+                from game.ui.battle.battle_interface.battle_cache import BattleCache
+                battle_cache = BattleCache(self.game_manager)
+                
+                # 预加载战斗资源
+                battle_cache.preload_battle_assets()
+                
+                # 设置缓存到界面
+                if hasattr(self.battle_interface, 'cards_manager'):
+                    self.battle_interface.cards_manager.set_battle_cache(battle_cache)
+                    print("✅ [battle_page.py] 战斗缓存已设置")
+            
+            # 验证界面创建成功
+            if not self.battle_interface:
+                print("❌ [battle_page.py] 战斗界面创建失败")
+                return False
+                
+            print("✅ [battle_page.py] 战斗界面创建成功")
+            return True
+            
+        except ImportError as e:
+            print(f"❌ [battle_page.py] 导入BattleInterface失败: {e}")
+            return False
+        except Exception as e:
+            print(f"❌ [battle_page.py] 创建战斗界面异常: {e}")
+            import traceback
+            traceback.print_exc()
+            return False
+
+    def _wait_for_interface_ready(self):
+        """等待界面准备完成"""
+        print("🎮 [battle_page.py] 等待界面初始化完成...")
+        
+        if not self.battle_interface or not hasattr(self.battle_interface, 'cards_manager'):
+            print("❌ [battle_page.py] 界面初始化失败")
+            return
+        
+        try:
+            # 🧩 填充 cards_manager 卡组内容
+            battle_state_result = self.battle_controller.get_current_state()
+            print(f"🔍 [调试] 调用get_current_state()结果:")
+            print(f"   结果类型: {type(battle_state_result)}")
+            
+            if battle_state_result.get("success"):
+                actual_battle_state = battle_state_result["state"]
+                print(f"🔍 [调试] 提取实际状态: {type(actual_battle_state)}")
+                self.battle_interface.cards_manager.populate_from_state(actual_battle_state)
+                print("✅ 已将战斗状态同步到 cards_manager")
+            else:
+                print(f"⚠️ 获取战斗状态失败: {battle_state_result.get('error')}")
+            
+            # ✅ 给界面一点时间完成渲染
+            print("📡 [battle_page.py] 界面数据填充完成，等待渲染...")
+            pygame.time.wait(200)  # 等待200ms让界面完成渲染
+            
+            # ✅ 强制渲染一帧确保界面就绪
+            if hasattr(self, 'screen'):
+                self.battle_interface.draw(self.screen)
+                pygame.display.flip()
+                print("🎨 [battle_page.py] 强制渲染一帧")
+            
+            # 📡 现在通知战斗控制器界面准备完成
+            print("📡 [battle_page.py] 通知战斗控制器界面准备完成...")
+            
+            if hasattr(self.battle_controller, 'notify_interface_ready'):
+                result = self.battle_controller.notify_interface_ready()
+                if result.get("success"):
+                    print("✅ [battle_page.py] 界面同步通知成功")
+                else:
+                    print(f"❌ [battle_page.py] 界面同步通知失败: {result.get('error')}")
+            else:
+                print("⚠️ [battle_page.py] 控制器没有notify_interface_ready方法")
+            
+            print("✅ [battle_page.py] 同步战斗界面显示完成")
+            
+        except Exception as e:
+            print(f"❌ [battle_page.py] 界面准备过程异常: {e}")
+            import traceback
+            traceback.print_exc()
+
 
     def _show_battle_interface_synchronized(self, battle_id):
         """显示同步战斗界面"""
@@ -455,6 +557,7 @@ class BattlePage:
             
             # 设置状态
             self.current_state = "battle_interface"
+            print(f"🔄 [battle_page.py] 状态切换到: {self.current_state}")
             self.current_battle_id = battle_id
             
             print(f"✅ [battle_page.py] 同步战斗界面创建成功")
@@ -620,6 +723,10 @@ class BattlePage:
                     print(f"❌ 3参数构造函数也失败: {e2}")
                     raise e2
             
+            # 在成功创建 self.battle_interface 实例后添加
+            if self.battle_cache:
+                self.battle_cache.preload_cards_from_battle(self.battle_controller)
+
             # 设置状态
             self.current_state = "battle_interface"
             self.current_battle_id = battle_id
@@ -775,21 +882,20 @@ class BattlePage:
 
 # 7. 退出战斗界面的方法
     def _exit_battle_interface(self):
-        """退出战斗界面，返回战斗页面"""
-        print("🔙 [battle_page.py] 退出战斗界面，返回战斗页面")
+        """退出战斗界面"""
+        print("🚪 [battle_page.py] 退出战斗界面")
         
         try:
-            # 清理战斗界面
-            if self.battle_interface and hasattr(self.battle_interface, 'cleanup'):
-                self.battle_interface.cleanup()
-            self.battle_interface = None
+            if self.battle_interface:
+                # 清理界面资源
+                if hasattr(self.battle_interface, 'cleanup'):
+                    self.battle_interface.cleanup()
+                self.battle_interface = None
             
-            # 重置状态
-            self.current_state = "lobby"
-            self.current_battle_id = None
-            
-            print("✅ [battle_page.py] 已返回战斗页面大厅")
-            
+            # 返回战斗准备状态
+            self.current_state = "battle_prep"
+            print("✅ [battle_page.py] 已返回战斗准备状态")
+
         except Exception as e:
             print(f"❌ [battle_page.py] 退出战斗界面失败: {e}")
 
@@ -828,10 +934,17 @@ class BattlePage:
     def draw(self, screen):
         """绘制页面内容"""
         try:
-            # 🆕 如果在战斗界面状态，只绘制战斗界面
+            # 如果在战斗界面状态，只渲染战斗界面
             if self.current_state == "battle_interface" and self.battle_interface:
                 self.battle_interface.draw(screen)
                 return
+            
+            # 否则渲染原有的battle_page界面
+            screen.fill((50, 50, 50))
+            
+            # 只在非战斗界面状态下渲染UI管理器
+            if hasattr(self, 'ui_manager') and self.ui_manager:
+                self.ui_manager.draw_ui(screen)
             
             # 原有的绘制逻辑
             # 绘制装饰背景

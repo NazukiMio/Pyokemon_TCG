@@ -5,8 +5,8 @@
 
 import pygame
 import pygame_gui
-from ..styles.theme import Theme
-from ..styles.fonts import font_manager
+from game.scenes.styles.theme import Theme
+from game.scenes.styles import fonts
 
 class ModernInput:
     """现代毛玻璃风格输入框组件"""
@@ -22,6 +22,7 @@ class ModernInput:
             is_password: 是否为密码输入框
             ui_manager: pygame-gui管理器
         """
+        fonts.font_manager = fonts.FontManager()
         self.rect = rect
         self.placeholder = placeholder
         self.label = label
@@ -104,7 +105,7 @@ class ModernInput:
     def _draw_label(self, screen, screen_height):
         """绘制标签"""
         label_color = Theme.get_color('text_secondary')
-        label_surface = font_manager.render_text(
+        label_surface = fonts.font_manager.render_text(
             self.label, 'md', screen_height, label_color
         )
         label_rect = label_surface.get_rect()
@@ -138,7 +139,7 @@ class ModernInput:
     def _draw_error_message(self, screen, screen_height):
         """绘制错误信息"""
         error_color = Theme.get_color('error')
-        error_surface = font_manager.render_text(
+        error_surface = fonts.font_manager.render_text(
             self.error_message, 'sm', screen_height, error_color
         )
         error_rect = error_surface.get_rect()
@@ -279,7 +280,7 @@ class PasswordStrengthIndicator:
         
         # 强度文本
         if self.message:
-            text_surface = font_manager.render_text(
+            text_surface = fonts.font_manager.render_text(
                 self.message, 'sm', screen_height, color
             )
             text_rect = text_surface.get_rect(
