@@ -3,7 +3,7 @@
 
 """
 修复后的Pokemon TCG战斗界面
-重点解决数据获取问题，确保获取真实卡牌数据而不是占位符
+解决时序、显示和交互问题
 """
 
 import pygame
@@ -156,7 +156,6 @@ class PokemonCardsManager(CardsManager):
         # 验证状态
         is_valid, message = self.validate_state(battle_state)
         print(f"   状态有效性: {is_valid} - {message}")
-
 class FixedPokemonFieldGraphic(VerticalPileGraphic):
     """修复的Pokemon场地图形类"""
     
@@ -807,408 +806,126 @@ class BattleInterface:
                 )
             )
     
-    # ======================================
-    # 🔥 核心修复：数据获取机制
-    # ======================================
-    
-    def _get_real_player_data(self):
-        """🔥 获取真实玩家数据，而不是状态字典"""
-        try:
-            battle_manager = None
-            
-            # 🔥 修复：支持同步控制器架构
-            if (hasattr(self.battle_controller, '_sync_controller') and 
-                self.battle_controller._sync_controller and
-                hasattr(self.battle_controller._sync_controller, 'current_battle') and
-                self.battle_controller._sync_controller.current_battle):
-                
-                battle_manager = self.battle_controller._sync_controller.current_battle
-                print(f"✅ [修复] 通过同步控制器找到战斗管理器: {type(battle_manager)}")
-                
-            # 回退：检查直接路径
-            elif (self.battle_controller and 
-                hasattr(self.battle_controller, 'current_battle') and
-                self.battle_controller.current_battle):
-                
-                battle_manager = self.battle_controller.current_battle
-                print(f"✅ [修复] 通过直接路径找到战斗管理器: {type(battle_manager)}")
-            
-            if battle_manager:
-                player_state = battle_manager.get_player_state(1)  # 玩家ID=1
-                
-                if player_state:
-                    print(f"✅ [修复] 获取真实玩家数据成功")
-                    print(f"   手牌数量: {len(player_state.hand) if hasattr(player_state, 'hand') and player_state.hand else 0}")
-                    print(f"   前排Pokemon: {'是' if player_state.active_pokemon else '否'}")
-                    print(f"   后备Pokemon数量: {len(player_state.bench_pokemon) if hasattr(player_state, 'bench_pokemon') and player_state.bench_pokemon else 0}")
-                    return player_state
-                else:
-                    print("❌ [修复] 获取玩家状态为空")
-            else:
-                print("❌ [修复] 未找到战斗管理器")
-                print(f"   battle_controller类型: {type(self.battle_controller)}")
-                print(f"   有_sync_controller: {hasattr(self.battle_controller, '_sync_controller')}")
-                print(f"   有current_battle: {hasattr(self.battle_controller, 'current_battle')}")
-                        
-        except Exception as e:
-            print(f"❌ [修复] 获取真实玩家数据失败: {e}")
-            import traceback
-            traceback.print_exc()
-        
-        return None
-    
-    def _get_real_opponent_data(self):
-        """🔥 获取真实对手数据"""
-        try:
-            battle_manager = None
-            
-            # 🔥 修复：支持同步控制器架构
-            if (hasattr(self.battle_controller, '_sync_controller') and 
-                self.battle_controller._sync_controller and
-                hasattr(self.battle_controller._sync_controller, 'current_battle') and
-                self.battle_controller._sync_controller.current_battle):
-                
-                battle_manager = self.battle_controller._sync_controller.current_battle
-                
-            # 回退：检查直接路径
-            elif (self.battle_controller and 
-                hasattr(self.battle_controller, 'current_battle') and
-                self.battle_controller.current_battle):
-                
-                battle_manager = self.battle_controller.current_battle
-            
-            if battle_manager:
-                opponent_state = battle_manager.get_player_state(999)  # AI玩家ID=999
-                
-                if opponent_state:
-                    print(f"✅ [修复] 获取真实对手数据成功")
-                    print(f"   手牌数量: {len(opponent_state.hand) if hasattr(opponent_state, 'hand') and opponent_state.hand else 0}")
-                    print(f"   前排Pokemon: {'是' if opponent_state.active_pokemon else '否'}")
-                    return opponent_state
-                        
-        except Exception as e:
-            print(f"❌ [修复] 获取真实对手数据失败: {e}")
-        
-        return None
-    
-    def _create_real_card_adapter(self, card_instance, area_name="Unknown"):
-        """🔥 创建真实卡牌适配器，而不是占位符"""
-        try:
-            # 检查card_instance的结构
-            if hasattr(card_instance, 'card'):
-                # 如果是带有.card属性的实例（如CardInstance）
-                card_data = card_instance.card
-                instance_id = getattr(card_instance, 'instance_id', f'unknown_{area_name}')
-            else:
-                # 如果直接是Card对象
-                card_data = card_instance
-                instance_id = f'card_{area_name}'
-            
-            # 创建适配器
-            adapter = PokemonCardAdapter(card_data, instance_id)
-            
-            print(f"✅ [修复] 创建真实卡牌适配器: {card_data.name} (ID: {instance_id})")
-            return adapter
-            
-        except Exception as e:
-            print(f"❌ [修复] 创建真实卡牌适配器失败: {e}")
-            # 回退到占位符
-            return self._create_fallback_placeholder(card_instance, area_name)
-    
-    def _create_fallback_placeholder(self, card_instance, area_name):
-        """创建回退占位符"""
-        try:
-            from game.core.cards.card_data import Card
-            
-            # 尝试提取卡牌名称
-            card_name = "Unknown Card"
-            if hasattr(card_instance, 'card') and hasattr(card_instance.card, 'name'):
-                card_name = card_instance.card.name
-            elif hasattr(card_instance, 'name'):
-                card_name = card_instance.name
-            
-            placeholder_card = Card(
-                id=f"placeholder_{area_name}",
-                name=card_name,
-                rarity="Common",
-                types=[]
-            )
-            
-            adapter = PokemonCardAdapter(placeholder_card)
-            print(f"⚠️ [修复] 创建回退占位符: {card_name}")
-            return adapter
-            
-        except Exception as e:
-            print(f"❌ [修复] 创建回退占位符也失败: {e}")
-            return None
-    
     def _update_battle_state(self):
-        """🔥 修复：更新战斗状态 - 使用真实数据"""
+        """更新战斗状态"""
         try:
-            if not self.battle_controller:
-                print("⚠️ [修复] 战斗控制器为None")
+            if not self.battle_controller or not self.battle_controller.current_battle:
                 return
             
-            print("🔄 [修复] 开始更新战斗状态...")
+            battle_manager = self.battle_controller.current_battle
+            self.battle_state = battle_manager.battle_state
             
-            # 🔥 使用新的数据获取方式
-            player_state = self._get_real_player_data()
-            opponent_state = self._get_real_opponent_data()
+            # 🔍 添加调试信息
+            print(f"🔍 [调试] battle_manager类型: {type(battle_manager)}")
+            print(f"🔍 [调试] battle_state类型: {type(self.battle_state)}")
+            print(f"🔍 [调试] battle_state属性: {dir(self.battle_state)}")
+            if hasattr(self.battle_state, 'get_player_state'):
+                print(f"✅ [调试] battle_state有get_player_state方法")
+            else:
+                print(f"❌ [调试] battle_state没有get_player_state方法")
+
+            player_state = battle_manager.get_player_state(1)  # 玩家ID=1
+            ai_state = battle_manager.get_player_state(999)    # AI玩家ID=999
             
             if player_state:
-                print("🔥 [修复] 处理玩家真实数据...")
-                
-                # 🔥 更新手牌 - 使用真实卡牌数据
+                # 更新手牌
+                # 🔧 修复：更新手牌 - 从实际player_state获取
                 if hasattr(player_state, 'hand') and player_state.hand:
-                    print(f"🃏 [修复] 更新玩家手牌: {len(player_state.hand)} 张真实卡牌")
-                    self._update_real_hand_cards(player_state.hand)
+                    print(f"🃏 [修复] 更新玩家手牌: {len(player_state.hand)} 张")
+                    self._safe_update_cardset(self.game_board.player_hand, player_state.hand, "Mano Jugador")
                 else:
-                    print("⚠️ [修复] 玩家手牌数据为空")
+                    print("⚠️ [修复] 玩家手牌数据为空，清空显示")
                     self.game_board.player_hand.clear()
                 
-                # 🔥 更新前排Pokemon - 使用真实数据
+                # 更新前排Pokemon
                 if player_state.active_pokemon:
-                    print(f"🎯 [修复] 更新玩家前排Pokemon: {player_state.active_pokemon.card.name if hasattr(player_state.active_pokemon, 'card') else '未知'}")
-                    self._update_real_pokemon_area(self.game_board.player_active, [player_state.active_pokemon], "player_active")
+                    self._safe_update_cardset(self.game_board.player_active, [player_state.active_pokemon], "Activo Jugador")
                 else:
                     self.game_board.player_active.clear()
                 
-                # 🔥 更新后备区Pokemon - 使用真实数据
-                if hasattr(player_state, 'bench_pokemon') and player_state.bench_pokemon:
-                    print(f"🏟️ [修复] 更新玩家后备区: {len(player_state.bench_pokemon)} 只Pokemon")
-                    self._update_real_bench_pokemon(player_state.bench_pokemon)
-                else:
-                    self._clear_bench_areas()
+                # 更新后备区Pokemon
+                bench_pokemon = player_state.bench_pokemon
+                bench_areas = [
+                    self.game_board.player_bench_1,
+                    self.game_board.player_bench_2,
+                    self.game_board.player_bench_3
+                ]
                 
-                # 🔧 修复：使用新的卡组显示方法
-                if hasattr(player_state, 'deck'):
-                    deck_size = len(player_state.deck)
-                    print(f"🃏 [修复] 更新玩家卡组显示: {deck_size} 张")
-                    self._update_deck_display(self.game_board.player_deck, deck_size)
+                for i, bench_area in enumerate(bench_areas):
+                    bench_area.clear()
+                    if i < len(bench_pokemon) and bench_pokemon[i] is not None:
+                        self._safe_update_cardset(bench_areas[i], [bench_pokemon[i]], f"Banca Jucador {i+1}")
+                
+                # 更新卡组显示（显示卡背）
+                self._update_deck_display(self.game_board.player_deck, len(player_state.deck))
             
-            if opponent_state:
-                print("🔥 [修复] 处理对手真实数据...")
+            if ai_state:
+                # 更新AI手牌显示（显示卡背）
+                self._update_deck_display(self.game_board.opponent_hand, len(ai_state.hand))
                 
-                # 🔧 修复：使用简化的对手手牌显示
-                if hasattr(opponent_state, 'hand') and opponent_state.hand:
-                    hand_size = len(opponent_state.hand)
-                    print(f"🃏 [修复] 对手手牌: {hand_size} 张 (显示为卡背)")
-                    self._update_opponent_hand_backs(hand_size)
-                
-                # 对手前排Pokemon
-                if opponent_state.active_pokemon:
-                    print(f"🎯 [修复] 更新对手前排Pokemon: {opponent_state.active_pokemon.card.name if hasattr(opponent_state.active_pokemon, 'card') else '未知'}")
-                    self._update_real_pokemon_area(self.game_board.opponent_active, [opponent_state.active_pokemon], "opponent_active")
+                # 更新AI前排
+                if ai_state.active_pokemon:
+                    self._safe_update_cardset(self.game_board.opponent_active, [ai_state.active_pokemon], "Activo Rival")
                 else:
                     self.game_board.opponent_active.clear()
                 
-                # 对手后备区
-                if hasattr(opponent_state, 'bench_pokemon') and opponent_state.bench_pokemon:
-                    print(f"🏟️ [修复] 更新对手后备区: {len(opponent_state.bench_pokemon)} 只Pokemon")
-                    self._update_real_opponent_bench(opponent_state.bench_pokemon)
-                else:
-                    self._clear_opponent_bench_areas()
+                # 更新AI后备区
+                ai_bench_pokemon = ai_state.bench_pokemon
+                ai_bench_areas = [
+                    self.game_board.opponent_bench_1,
+                    self.game_board.opponent_bench_2,
+                    self.game_board.opponent_bench_3
+                ]
                 
-                # 🔧 修复：使用新的对手卡组显示方法
-                if hasattr(opponent_state, 'deck'):
-                    deck_size = len(opponent_state.deck)
-                    print(f"🃏 [修复] 更新对手卡组显示: {deck_size} 张")
-                    self._update_deck_display(self.game_board.opponent_deck, deck_size)
+                for i, bench_area in enumerate(ai_bench_areas):
+                    bench_area.clear()
+                    if i < len(ai_bench_pokemon) and ai_bench_pokemon[i] is not None:
+                        self._safe_update_cardset(ai_bench_areas[i], [ai_bench_pokemon[i]], f"Banca Enemiga {i+1}")
+                
+                # 更新AI卡组显示
+                self._update_deck_display(self.game_board.opponent_deck, len(ai_state.deck))
             
-            print("✅ [修复] 战斗状态更新完成")
-            
-        except Exception as e:
-            print(f"❌ [修复] 更新战斗状态失败: {e}")
-            import traceback
-            traceback.print_exc()
-    
-    def _update_real_hand_cards(self, hand_cards):
-        """🔥 更新真实手牌卡牌"""
-        try:
-            self.game_board.player_hand.clear()
-            
-            for i, card_instance in enumerate(hand_cards[:7]):  # 最多显示7张
-                adapter = self._create_real_card_adapter(card_instance, f"hand_{i+1}")
-                if adapter:
-                    self.game_board.player_hand.append(adapter)
-                    
-            print(f"✅ [修复] 手牌更新完成: {len(self.game_board.player_hand)} 张")
-            
-        except Exception as e:
-            print(f"❌ [修复] 更新真实手牌失败: {e}")
-            import traceback
-            traceback.print_exc()
-    
-    def _update_real_pokemon_area(self, cardset, pokemon_list, area_name):
-        """🔥 更新真实Pokemon区域"""
-        try:
-            cardset.clear()
-            
-            for pokemon_instance in pokemon_list:
-                if pokemon_instance:
-                    adapter = self._create_real_card_adapter(pokemon_instance, area_name)
-                    if adapter:
-                        cardset.append(adapter)
-                        
-            print(f"✅ [修复] {area_name}更新完成: {len(cardset)} 只Pokemon")
-            
-        except Exception as e:
-            print(f"❌ [修复] 更新{area_name}失败: {e}")
-    
-    def _update_real_bench_pokemon(self, bench_pokemon):
-        """🔥 更新真实后备区Pokemon"""
-        bench_areas = [
-            self.game_board.player_bench_1,
-            self.game_board.player_bench_2,
-            self.game_board.player_bench_3
-        ]
-        
-        # 清空所有后备区
-        for bench_area in bench_areas:
-            bench_area.clear()
-        
-        # 分配Pokemon到后备区槽位
-        for i, pokemon_instance in enumerate(bench_pokemon[:3]):  # 最多3只
-            if i < len(bench_areas) and pokemon_instance:
-                adapter = self._create_real_card_adapter(pokemon_instance, f"player_bench_{i+1}")
-                if adapter:
-                    bench_areas[i].append(adapter)
-                    print(f"✅ [修复] 后备区{i+1}更新: {pokemon_instance.card.name if hasattr(pokemon_instance, 'card') else '未知Pokemon'}")
-    
-    def _update_real_opponent_bench(self, bench_pokemon):
-        """🔥 更新真实对手后备区"""
-        bench_areas = [
-            self.game_board.opponent_bench_1,
-            self.game_board.opponent_bench_2,
-            self.game_board.opponent_bench_3
-        ]
-        
-        # 清空所有对手后备区
-        for bench_area in bench_areas:
-            bench_area.clear()
-        
-        # 分配对手Pokemon到后备区槽位
-        for i, pokemon_instance in enumerate(bench_pokemon[:3]):  # 最多3只
-            if i < len(bench_areas) and pokemon_instance:
-                adapter = self._create_real_card_adapter(pokemon_instance, f"opponent_bench_{i+1}")
-                if adapter:
-                    bench_areas[i].append(adapter)
-                    print(f"✅ [修复] 对手后备区{i+1}更新: {pokemon_instance.card.name if hasattr(pokemon_instance, 'card') else '未知Pokemon'}")
+            # 更新控制面板
+            self.control_panel.update_button_states(self.battle_state, player_state)
 
-    def _update_deck_display(self, cardset: CardsSet, card_count: int):
-        """更新卡组显示（显示卡背）"""
-        try:
-            # 清空现有卡组
-            cardset.clear()
+            # populate 管理
+            self.cards_manager.populate_from_state(self.battle_state)
             
-            # 创建虚拟卡背来表示卡组
-            if card_count > 0:
-                from game.core.cards.card_data import Card
-                dummy_card = Card(
-                    id="card_back",
-                    name="Card Back",
-                    rarity="Common",
-                    types=[]
-                )
-                
-                # 只添加一张卡牌来表示整个卡组
-                adapter = PokemonCardAdapter(dummy_card, "deck_back")
-                cardset.append(adapter)
         except Exception as e:
-            print(f"❌ 更新卡组显示失败: {e}")
-    
-    def _update_opponent_hand_backs(self, hand_count):
-        """🔥 更新对手手牌卡背显示 - 使用数量渲染避免ID冲突"""
-        try:
-            self.game_board.opponent_hand.clear()
-            
-            if hand_count > 0:
-                from game.core.cards.card_data import Card
-                # 创建一个卡背对象
-                card_back = Card(
-                    id="opponent_card_back", 
-                    name="Card Back", 
-                    rarity="Common", 
-                    types=[]
-                )
-                adapter = PokemonCardAdapter(card_back, "opponent_hand_back")
-                
-                # 根据数量添加多次（同一个对象，避免ID冲突）
-                for _ in range(min(hand_count, 7)):  # 最多显示7张
-                    self.game_board.opponent_hand.append(adapter)
-                    
-                print(f"✅ [修复] 对手手牌卡背更新: {len(self.game_board.opponent_hand)} 张")
-                
-        except Exception as e:
-            print(f"❌ [修复] 更新对手手牌卡背失败: {e}")
-    
-    def _clear_bench_areas(self):
-        """清空玩家后备区"""
-        bench_areas = [
-            self.game_board.player_bench_1,
-            self.game_board.player_bench_2,
-            self.game_board.player_bench_3
-        ]
-        
-        for bench_area in bench_areas:
-            bench_area.clear()
-    
-    def _clear_opponent_bench_areas(self):
-        """清空对手后备区"""
-        bench_areas = [
-            self.game_board.opponent_bench_1,
-            self.game_board.opponent_bench_2,
-            self.game_board.opponent_bench_3
-        ]
-        
-        for bench_area in bench_areas:
-            bench_area.clear()
-    
-    # ======================================
-    # 保留原有的setup_from_battle_state方法作为备用
-    # ======================================
+            print(f"❌ 更新战斗状态失败: {e}")
+            import traceback
+            traceback.print_exc()
     
     def setup_from_battle_state(self, battle_state):
         """
         Configura la interfaz según el estado de batalla proporcionado.
-        🔥 修复版：优先使用真实数据，备用字典数据
+        Agrega las cartas correspondientes a cada zona visual.
         """
-        print(f"🔍 [修复] setup_from_battle_state接收到:")
+        print(f"🔍 [调试] setup_from_battle_state接收到:")
         print(f"   参数类型: {type(battle_state)}")
         
-        # 🔥 优先尝试获取真实数据
-        player_state = self._get_real_player_data()
-        opponent_state = self._get_real_opponent_data()
-        
-        if player_state or opponent_state:
-            print("✅ [修复] 使用真实数据更新界面")
-            # 真实数据已经在_update_battle_state中处理了
-            return
-        
-        # 🔄 回退：如果无法获取真实数据，使用字典数据
-        print("⚠️ [修复] 回退到字典数据处理")
-        
+        # ✅ 修复：直接处理字典格式的状态
         if not isinstance(battle_state, dict):
-            print("❌ battle_state不是字典格式且无法获取真实数据")
+            print("❌ battle_state不是字典格式")
             return
         
         # 从字典中提取玩家状态
         player_data = battle_state.get('player', {})
         opponent_data = battle_state.get('opponent', {})
         
-        print(f"🔍 [修复] 字典数据 - 玩家: {player_data}")
-        print(f"🔍 [修复] 字典数据 - 对手: {opponent_data}")
+        print(f"🔍 [调试] 玩家数据: {player_data}")
+        print(f"🔍 [调试] 对手数据: {opponent_data}")
         
-        # 清理所有卡牌区域
+        # ✅ 清理所有卡牌区域
         self._clear_all_cardsets()
         
         try:
-            # 根据字典数据填充界面
+            # ✅ 根据字典数据填充界面
             self._populate_from_dict_data(player_data, opponent_data)
-            print("✅ [修复] 字典数据填充完成")
+            print("✅ 界面数据填充完成")
             
         except Exception as e:
-            print(f"❌ [修复] 填充界面数据失败: {e}")
+            print(f"❌ 填充界面数据失败: {e}")
             import traceback
             traceback.print_exc()
 
@@ -1244,16 +961,16 @@ class BattleInterface:
         print("✅ 卡牌区域清理完成")
 
     def _populate_from_dict_data(self, player_data, opponent_data):
-        """根据字典数据填充界面（回退方案）"""
+        """根据字典数据填充界面"""
         
-        # 处理玩家前排Pokemon
+        # ✅ 处理玩家前排Pokemon
         if player_data.get('active_pokemon'):
             active_info = player_data['active_pokemon']
             print(f"🔍 设置玩家前排: {active_info}")
             if hasattr(self.game_board, 'player_active'):
                 self._create_placeholder_card(self.game_board.player_active, active_info)
         
-        # 处理对手前排Pokemon
+        # ✅ 处理对手前排Pokemon
         if opponent_data.get('active_pokemon'):
             active_info = opponent_data['active_pokemon']
             print(f"🔍 设置对手前排: {active_info}")
@@ -1266,13 +983,37 @@ class BattleInterface:
         print(f"🔍 玩家手牌数量: {player_hand_size}")
 
         if player_hand_size > 0 and hasattr(self.game_board, 'player_hand'):
+            # 尝试获取真实手牌数据
+            real_hand_cards = []
+            if hasattr(self, 'battle_controller') and self.battle_controller.current_battle:
+                try:
+                    player_state = self.battle_controller.current_battle.get_player_state(1)
+                    if player_state and hasattr(player_state, 'hand') and player_state.hand:
+                        real_hand_cards = player_state.hand[:7]  # 最多7张
+                        print(f"✅ [修复] 获取到真实手牌: {len(real_hand_cards)} 张")
+                except Exception as e:
+                    print(f"⚠️ [修复] 获取真实手牌失败: {e}")
+            
             # 创建手牌显示
-            for i in range(min(player_hand_size, 7)):  # 最多7张
-                card_info = {'name': f'Hand Card {i+1}', 'instance_id': f'hand_{i+1}'}
-                self._create_placeholder_card(self.game_board.player_hand, card_info)
-                print(f"✅ 创建占位手牌 {i+1}")
+            if real_hand_cards:
+                # 使用真实手牌数据
+                for i, card_instance in enumerate(real_hand_cards):
+                    if hasattr(card_instance, 'card') and hasattr(card_instance.card, 'name'):
+                        card_info = {
+                            'name': card_instance.card.name,
+                            'instance_id': getattr(card_instance, 'instance_id', f'hand_{i+1}')
+                        }
+                        self._create_placeholder_card(self.game_board.player_hand, card_info)
+                        print(f"✅ 创建真实手牌 {i+1}: {card_instance.card.name}")
+            else:
+                # 回退到占位符
+                print(f"🔄 [修复] 使用占位符手牌")
+                for i in range(min(player_hand_size, 7)):
+                    card_info = {'name': f'Hand Card {i+1}', 'instance_id': f'hand_{i+1}'}
+                    self._create_placeholder_card(self.game_board.player_hand, card_info)
+                    print(f"✅ 创建占位手牌 {i+1}")
         
-        # 修复：处理对手手牌（显示多张卡背）
+        # ✅ 修复：处理对手手牌（显示多张卡背）
         opponent_hand_size = opponent_data.get('hand_size', 0)
         print(f"🔍 对手手牌数量: {opponent_hand_size}")
         if opponent_hand_size > 0 and hasattr(self.game_board, 'opponent_hand'):
@@ -1281,16 +1022,18 @@ class BattleInterface:
                 self._create_placeholder_card(self.game_board.opponent_hand, card_info)
                 print(f"✅ 创建对手手牌卡背 {i+1}")
         
-        # 处理卡组显示
+        # ✅ 处理卡组显示
         player_deck_size = player_data.get('deck_size', 0)
         if player_deck_size > 0 and hasattr(self.game_board, 'player_deck'):
-            self._update_deck_display(self.game_board.player_deck, player_deck_size)
-            print(f"✅ 创建玩家卡组显示 (剩余 {player_deck_size} 张)")
-
+            card_info = {'name': 'Player Deck', 'instance_id': 'player_deck'}
+            self._create_placeholder_card(self.game_board.player_deck, card_info)
+            print(f"✅ 创建玩家卡组 (剩余 {player_deck_size} 张)")
+        
         opponent_deck_size = opponent_data.get('deck_size', 0)
         if opponent_deck_size > 0 and hasattr(self.game_board, 'opponent_deck'):
-            self._update_deck_display(self.game_board.opponent_deck, opponent_deck_size)
-            print(f"✅ 创建对手卡组显示 (剩余 {opponent_deck_size} 张)")
+            card_info = {'name': 'Opponent Deck', 'instance_id': 'opponent_deck'}
+            self._create_placeholder_card(self.game_board.opponent_deck, card_info)
+            print(f"✅ 创建对手卡组 (剩余 {opponent_deck_size} 张)")
         
         # 统计结果
         stats = []
@@ -1328,7 +1071,7 @@ class BattleInterface:
             from game.core.cards.card_data import Card
             from .pokemon_card_adapter import PokemonCardAdapter
             
-            # 修复：提取正确的card_id
+            # ✅ 修复：提取正确的card_id
             instance_id = card_info.get('instance_id', 'placeholder')
             if instance_id != 'placeholder':
                 card_id = self._extract_card_id_from_instance(instance_id)
@@ -1352,7 +1095,6 @@ class BattleInterface:
             print(f"❌ 创建占位卡牌失败: {e}")
             import traceback
             traceback.print_exc()
-    
     def _safe_update_cardset(self, cardset: CardsSet, cards_data, name: str):
         """安全地更新卡牌集合"""
         try:
@@ -1411,6 +1153,11 @@ class BattleInterface:
                 print("🔙 ESC键按下，返回战斗页面")
                 return "back_to_battle_page"
         
+        # ✅ 修复：移除ui_manager访问，让BattlePage处理pygame_gui事件
+        # ❌ 删除这些错误的代码：
+        # if self.cards_manager and self.cards_manager.ui_manager:
+        #     self.cards_manager.ui_manager.process_events(event)
+
         # 处理控制面板点击
         if event.type == pygame.MOUSEBUTTONDOWN:
             if hasattr(self, 'control_panel') and self.control_panel:
@@ -1419,7 +1166,7 @@ class BattleInterface:
                     self._handle_button_click(button_clicked)
                     return None
         
-        # 只处理卡牌管理器事件
+        # ✅ 只处理卡牌管理器事件
         if hasattr(self, 'cards_manager') and self.cards_manager:
             self.cards_manager.process_events(event)
         
@@ -1456,6 +1203,34 @@ class BattleInterface:
             elif button_name == "surrender":
                 self._surrender()
 
+
+        # if not self.battle_controller:
+        #     return
+        
+        # try:
+        #     if button_key == "draw_card":
+        #         result = self.battle_controller.process_player_action({"type": "draw_card"})
+        #         print(f"抽卡结果: {result}")
+            
+        #     elif button_key == "gain_energy":
+        #         result = self.battle_controller.process_player_action({"type": "gain_energy"})
+        #         print(f"获得能量结果: {result}")
+            
+        #     elif button_key == "attack":
+        #         result = self.battle_controller.process_player_action({
+        #             "type": "attack",
+        #             "parameters": {"attack_index": 0}
+        #         })
+        #         print(f"攻击结果: {result}")
+            
+        #     elif button_key == "end_turn":
+        #         result = self.battle_controller.process_player_action({"type": "end_turn"})
+        #         print(f"结束回合结果: {result}")
+            
+        #     elif button_key == "surrender":
+        #         print("🏳️ 玩家投降")
+        #         return "back_to_battle_page"
+        
         except Exception as e:
             print(f"❌ 处理按钮点击失败: {e}")
     
@@ -1570,9 +1345,18 @@ class BattleInterface:
     def _refresh_battle_display(self):
         """刷新战斗显示"""
         try:
-            # 🔥 使用新的数据更新机制
-            self._update_battle_state()
-            print("✅ 界面刷新完成")
+            if hasattr(self, 'battle_controller') and self.battle_controller:
+                # 获取最新战斗状态
+                current_state = self.battle_controller.get_current_state()
+                
+                if current_state.get("success"):
+                    battle_state = current_state.get("state")
+                    if battle_state and hasattr(self, 'cards_manager'):
+                        # 更新卡牌管理器
+                        self.cards_manager.populate_from_state(battle_state)
+                        print("✅ 界面刷新完成")
+                else:
+                    print(f"❌ 获取战斗状态失败: {current_state.get('error')}")
                     
         except Exception as e:
             print(f"❌ 刷新界面异常: {e}")

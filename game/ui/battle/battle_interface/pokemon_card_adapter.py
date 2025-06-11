@@ -76,42 +76,29 @@ class PokemonCardGraphics(AbstractCardGraphics):
             except Exception as e:
                 print(f"   ❌ 图片加载失败: {e}")
         
-        # ✅ 修复：调整卡片大小到80%并使用缩放而不是裁剪
-        # 计算80%大小
-        target_width = int(self.size[0] * 0.8)
-        target_height = int(self.size[1] * 0.8)
-        
+        # 🔧 修复：增加显示尺寸到95%
+        target_width = int(self.size[0] * 0.95)
+        target_height = int(self.size[1] * 0.95)
+
         # 创建表面（保持原始大小用于居中）
         surf = pygame.Surface(self.size, pygame.SRCALPHA)
-        
+
         # 如成功获得图片，则缩放后返回
         if card_image:
-            # 🔧 修复：调整缩放逻辑
+            # 🔧 修复：优化缩放算法
             image_rect = card_image.get_rect()
             
-            # 优先保持宽度，调整高度
+            # 计算缩放比例，优先保持宽高比
             scale_x = target_width / image_rect.width
             scale_y = target_height / image_rect.height
-            scale = min(scale_x, scale_y) * 1.2  # 🔧 增加20%显示面积
+            scale = min(scale_x, scale_y)
             
-            # 限制最大缩放
-            if scale > 1.0:
-                scale = 1.0
+            # 🔧 增加显示尺寸：适当放大缩放比例
+            scale = min(scale * 1.3, 1.0)  # 增加30%但不超过原尺寸
             
             # 计算缩放后的尺寸
             scaled_width = int(image_rect.width * scale)
             scaled_height = int(image_rect.height * scale)
-            
-            # 🔧 确保不超出容器
-            if scaled_width > target_width:
-                scale = target_width / image_rect.width
-                scaled_width = target_width
-                scaled_height = int(image_rect.height * scale)
-            
-            if scaled_height > target_height:
-                scale = target_height / image_rect.height
-                scaled_height = target_height
-                scaled_width = int(image_rect.width * scale)
             
             # 缩放图片
             scaled_image = pygame.transform.scale(card_image, (scaled_width, scaled_height))
