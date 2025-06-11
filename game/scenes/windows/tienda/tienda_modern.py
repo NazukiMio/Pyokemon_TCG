@@ -84,7 +84,7 @@ class ModernTiendaWindow:
         self.window = ShopWindow(
             rect=pygame.Rect(window_x, window_y, self.window_width, self.window_height),
             manager=ui_manager,
-            window_display_title=" Tienda Pokémon",
+            window_display_title="💫 Tienda Pokémon",
             resizable=False
         )
         

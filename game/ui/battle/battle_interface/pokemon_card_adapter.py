@@ -86,15 +86,32 @@ class PokemonCardGraphics(AbstractCardGraphics):
         
         # 如成功获得图片，则缩放后返回
         if card_image:
-            # 计算缩放比例，保持宽高比
+            # 🔧 修复：调整缩放逻辑
             image_rect = card_image.get_rect()
+            
+            # 优先保持宽度，调整高度
             scale_x = target_width / image_rect.width
             scale_y = target_height / image_rect.height
-            scale = min(scale_x, scale_y)  # 使用较小的缩放比例以保持完整显示
+            scale = min(scale_x, scale_y) * 1.2  # 🔧 增加20%显示面积
+            
+            # 限制最大缩放
+            if scale > 1.0:
+                scale = 1.0
             
             # 计算缩放后的尺寸
             scaled_width = int(image_rect.width * scale)
             scaled_height = int(image_rect.height * scale)
+            
+            # 🔧 确保不超出容器
+            if scaled_width > target_width:
+                scale = target_width / image_rect.width
+                scaled_width = target_width
+                scaled_height = int(image_rect.height * scale)
+            
+            if scaled_height > target_height:
+                scale = target_height / image_rect.height
+                scaled_height = target_height
+                scaled_width = int(image_rect.width * scale)
             
             # 缩放图片
             scaled_image = pygame.transform.scale(card_image, (scaled_width, scaled_height))
@@ -105,7 +122,7 @@ class PokemonCardGraphics(AbstractCardGraphics):
             
             # 渲染缩放后的图片
             surf.blit(scaled_image, (center_x, center_y))
-            print(f"✅ 渲染卡牌图片: {self.pokemon_card.name} (缩放比例: {scale:.2f})")
+            print(f"✅ 渲染卡牌图片: {self.pokemon_card.name} (缩放比例: {scale:.2f}, 尺寸: {scaled_width}x{scaled_height})")
             return surf
         
         # 否则执行原有降级绘制...

@@ -246,6 +246,35 @@ class BattlePage:
             print(f"❌ [battle_page.py] 事件处理异常: {e}")
             return None
     
+    def _handle_button_event(self, event):
+        """处理按钮事件"""
+        print(f"🎮 [battle_page.py] 按钮事件: {event.ui_element}")
+        
+        # 在战斗界面状态下不处理原有按钮
+        if self.current_state == "battle_interface":
+            return
+        
+        # 处理原有的按钮点击
+        try:
+            if hasattr(event, 'ui_element'):
+                ui_element = event.ui_element
+                
+                # 卡组构建按钮
+                if ui_element == self.deck_builder_button:
+                    print("🏗️ 卡组构建按钮被点击（通过事件）")
+                    self._open_deck_builder()
+                    
+                # 对战准备按钮  
+                elif ui_element == self.battle_prep_button:
+                    print("⚔️ 对战准备按钮被点击（通过事件）")
+                    self._open_battle_prep()
+                    
+                else:
+                    print(f"🔍 未知按钮事件: {ui_element}")
+                    
+        except Exception as e:
+            print(f"❌ 处理按钮事件失败: {e}")
+
     def _handle_mouse_motion(self, mouse_pos):
         """处理鼠标移动事件"""
         # 检查卡组构建按钮悬停

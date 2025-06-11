@@ -503,12 +503,12 @@ class FixedPokemonBattleBoard(GameBoard):
         
         cardsets_abs_size = {
             # 手牌区域
-            self.player_hand: (int(0.6 * self.game_area_width), int(0.15 * self.screen_height)),
+            self.player_hand: (int(0.6 * self.game_area_width), int(0.18 * self.screen_height)),
             self.opponent_hand: (int(0.6 * self.game_area_width), int(0.1 * self.screen_height)),
             
             # 战斗位
-            self.player_active: (int(0.14 * self.game_area_width), int(0.18 * self.screen_height)),
-            self.opponent_active: (int(0.14 * self.game_area_width), int(0.18 * self.screen_height)),
+            self.player_active: (int(0.14 * self.game_area_width), int(0.22 * self.screen_height)),
+            self.opponent_active: (int(0.14 * self.game_area_width), int(0.22 * self.screen_height)),
             
             # 备战区
             self.player_bench_1: (int(0.08 * self.game_area_width), int(0.12 * self.screen_height)),
@@ -829,7 +829,13 @@ class BattleInterface:
             
             if player_state:
                 # 更新手牌
-                self._safe_update_cardset(self.game_board.player_hand, player_state.hand, "Mano Jugador")
+                # 🔧 修复：更新手牌 - 从实际player_state获取
+                if hasattr(player_state, 'hand') and player_state.hand:
+                    print(f"🃏 [修复] 更新玩家手牌: {len(player_state.hand)} 张")
+                    self._safe_update_cardset(self.game_board.player_hand, player_state.hand, "Mano Jugador")
+                else:
+                    print("⚠️ [修复] 玩家手牌数据为空，清空显示")
+                    self.game_board.player_hand.clear()
                 
                 # 更新前排Pokemon
                 if player_state.active_pokemon:
@@ -971,23 +977,35 @@ class BattleInterface:
             if hasattr(self.game_board, 'opponent_active'):
                 self._create_placeholder_card(self.game_board.opponent_active, active_info)
         
-        # ✅ 处理手牌数量显示
-        player_hand_cards = player_data.get('hand', [])
-        if player_hand_cards and hasattr(self.game_board, 'player_hand'):
-            for i, card_data in enumerate(player_hand_cards[:7]):  # 最多显示7张
-                if isinstance(card_data, dict):
-                    card_info = {
-                        'name': card_data.get('name', f'Hand Card {i+1}'),
-                        'instance_id': card_data.get('instance_id', f'hand_{i+1}')
-                    }
-                else:
-                    # 如果是对象，尝试提取属性
-                    card_info = {
-                        'name': getattr(card_data, 'name', f'Hand Card {i+1}'),
-                        'instance_id': getattr(card_data, 'instance_id', f'hand_{i+1}')
-                    }
-                self._create_placeholder_card(self.game_board.player_hand, card_info)
-                print(f"✅ 创建玩家手牌 {i+1}: {card_info['name']}")
+            # 🔧 修复：从battle_controller获取真实手牌数据
+            if hasattr(self, 'battle_controller') and self.battle_controller.current_battle:
+                try:
+                    player_state = self.battle_controller.current_battle.get_player_state(1)
+                    if player_state and hasattr(player_state, 'hand') and player_state.hand:
+                        print(f"🃏 [修复] 获取真实手牌数据: {len(player_state.hand)} 张")
+                        for i, card_instance in enumerate(player_state.hand[:7]):  # 最多显示7张
+                            if hasattr(card_instance, 'card') and hasattr(card_instance.card, 'id'):
+                                card_info = {
+                                    'name': card_instance.card.name,
+                                    'instance_id': card_instance.instance_id
+                                }
+                                self._create_placeholder_card(self.game_board.player_hand, card_info)
+                                print(f"✅ 创建真实手牌 {i+1}: {card_instance.card.name}")
+                    else:
+                        print("⚠️ [修复] 无法获取真实手牌，使用占位符")
+                        # 回退到占位符逻辑
+                        player_hand_size = player_data.get('hand_size', 0)
+                        for i in range(min(player_hand_size, 7)):
+                            card_info = {'name': f'Hand Card {i+1}', 'instance_id': f'hand_{i+1}'}
+                            self._create_placeholder_card(self.game_board.player_hand, card_info)
+                            print(f"✅ 创建占位手牌 {i+1}")
+                except Exception as e:
+                    print(f"❌ [修复] 获取真实手牌失败: {e}")
+                    # 回退逻辑
+                    player_hand_size = player_data.get('hand_size', 0)
+                    for i in range(min(player_hand_size, 7)):
+                        card_info = {'name': f'Hand Card {i+1}', 'instance_id': f'hand_{i+1}'}
+                        self._create_placeholder_card(self.game_board.player_hand, card_info)
         
         # ✅ 修复：处理对手手牌（显示多张卡背）
         opponent_hand_size = opponent_data.get('hand_size', 0)
