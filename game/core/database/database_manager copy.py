@@ -228,20 +228,6 @@ class DatabaseManager:
                 UNIQUE(user_id, quest_type, quest_date)
             )
             ''')
-
-            # 用户会话表（安全机制）
-            self.cursor.execute('''
-            CREATE TABLE IF NOT EXISTS user_sessions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                session_token TEXT UNIQUE NOT NULL,
-                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                expires_at TIMESTAMP NOT NULL,
-                ip_address TEXT,
-                is_active BOOLEAN DEFAULT 1,
-                FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-            )
-            ''')
             
             # 插入默认卡包类型
             self.cursor.execute('''
@@ -312,9 +298,7 @@ class DatabaseManager:
             "CREATE INDEX IF NOT EXISTS idx_battles_player1 ON battles(player1_id)",
             "CREATE INDEX IF NOT EXISTS idx_battles_player2 ON battles(player2_id)",
             "CREATE INDEX IF NOT EXISTS idx_battles_type ON battles(battle_type)",
-            "CREATE INDEX IF NOT EXISTS idx_ai_opponents_difficulty ON ai_opponents(difficulty)",
-            "CREATE INDEX IF NOT EXISTS idx_user_sessions_token ON user_sessions(session_token)",
-            "CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id)"
+            "CREATE INDEX IF NOT EXISTS idx_ai_opponents_difficulty ON ai_opponents(difficulty)"
         ]
         
         for index_sql in indexes:
@@ -997,57 +981,5 @@ class DatabaseManager:
                 self.connection.rollback()
         self.close()
     
-    # 会话管理方法
-    def save_session(self, session_token, user_id, expires_at, ip_address=None):
-        """保存用户会话"""
-        try:
-            self.cursor.execute('''
-            INSERT INTO user_sessions (user_id, session_token, expires_at, ip_address)
-            VALUES (?, ?, ?, ?)
-            ''', (user_id, session_token, expires_at, ip_address))
-            self.connection.commit()
-            return True
-        except sqlite3.Error as e:
-            print(f"保存会话失败: {e}")
-            return False
-    
-    def validate_session(self, session_token):
-        """验证会话token并返回用户ID"""
-        try:
-            self.cursor.execute('''
-            SELECT user_id FROM user_sessions 
-            WHERE session_token = ? AND is_active = 1 AND expires_at > CURRENT_TIMESTAMP
-            ''', (session_token,))
-            result = self.cursor.fetchone()
-            return result[0] if result else None
-        except sqlite3.Error as e:
-            print(f"验证会话失败: {e}")
-            return None
-    
-    def delete_session(self, session_token):
-        """删除会话（登出）"""
-        try:
-            self.cursor.execute(
-                "UPDATE user_sessions SET is_active = 0 WHERE session_token = ?",
-                (session_token,)
-            )
-            self.connection.commit()
-            return True
-        except sqlite3.Error as e:
-            print(f"删除会话失败: {e}")
-            return False
-    
-    def cleanup_expired_sessions(self):
-        """清理过期会话"""
-        try:
-            self.cursor.execute(
-                "UPDATE user_sessions SET is_active = 0 WHERE expires_at <= CURRENT_TIMESTAMP"
-            )
-            self.connection.commit()
-            return self.cursor.rowcount
-        except sqlite3.Error as e:
-            print(f"清理过期会话失败: {e}")
-            return 0
-        
     def __del__(self):
         self.close()

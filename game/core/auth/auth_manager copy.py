@@ -19,57 +19,9 @@ class AuthManager:
             db_manager: 数据库管理器实例，如果为None则创建新实例
         """
         self.db_manager = db_manager if db_manager else DatabaseManager()
-        # self.current_user_id = None
-        self.current_token = None
+        self.current_user_id = None
         self.username = None
     
-    def _generate_session_token(self, user_id):
-        """生成会话令牌"""
-        import uuid
-        import base64
-        import time
-        import hashlib
-        
-        # 生成基础token
-        timestamp = str(int(time.time()))
-        random_part = str(uuid.uuid4())
-        raw_token = f"{user_id}:{timestamp}:{random_part}"
-        
-        # 生成校验码
-        checksum = hashlib.md5(raw_token.encode()).hexdigest()[:8]
-        
-        # 组合并编码
-        full_token = f"{raw_token}:{checksum}"
-        encoded_token = base64.b64encode(full_token.encode()).decode()
-        
-        return encoded_token
-    
-    def _validate_token_format(self, token):
-        """验证token格式并提取用户ID"""
-        try:
-            import base64
-            import hashlib
-            
-            # 解码token
-            decoded = base64.b64decode(token.encode()).decode()
-            parts = decoded.split(':')
-            
-            if len(parts) != 4:
-                return None
-            
-            user_id, timestamp, random_part, checksum = parts
-            
-            # 验证校验码
-            raw_token = f"{user_id}:{timestamp}:{random_part}"
-            expected_checksum = hashlib.md5(raw_token.encode()).hexdigest()[:8]
-            
-            if checksum != expected_checksum:
-                return None
-            
-            return int(user_id)
-        except Exception:
-            return None
-
     def register(self, username, password, confirm_password):
         """
         注册新用户
@@ -121,38 +73,13 @@ class AuthManager:
         
         if success:
             # 登录成功，保存用户信息
-            # self.current_user_id = result
-            # 登录成功，生成会话token
-            session_token = self._generate_session_token(result)
-            
-            # 计算过期时间（2小时后）
-            import datetime
-            expires_at = datetime.datetime.now() + datetime.timedelta(hours=2)
-            
-            # 保存会话到数据库
-            if self.db_manager.save_session(session_token, result, expires_at):
-                self.current_token = session_token
-                self.username = username
-                return True, "Inicio de sesión exitoso"
-            else:
-                return False, "Error al crear sesión"
-            # self.username = username
-            # return True, "Inicio de sesión exitoso"
+            self.current_user_id = result
+            self.username = username
+            return True, "Inicio de sesión exitoso"
         else:
             # 登录失败，返回错误消息
             return False, result
     
-    # def logout(self):
-    #     """
-    #     退出登录
-        
-    #     Returns:
-    #         成功标志
-    #     """
-    #     self.current_user_id = None
-    #     self.username = None
-    #     return True
-
     def logout(self):
         """
         退出登录
@@ -160,10 +87,7 @@ class AuthManager:
         Returns:
             成功标志
         """
-        if self.current_token:
-            self.db_manager.delete_session(self.current_token)
-        
-        self.current_token = None
+        self.current_user_id = None
         self.username = None
         return True
     
@@ -174,8 +98,7 @@ class AuthManager:
         Returns:
             布尔值表示登录状态
         """
-        # return self.current_user_id is not None
-        return self.get_current_user_id() is not None
+        return self.current_user_id is not None
     
     def get_current_user_id(self):
         """
@@ -184,23 +107,7 @@ class AuthManager:
         Returns:
             用户ID或None
         """
-        # return self.current_user_id
-        if not self.current_token:
-            return None
-        
-        # 先验证token格式
-        user_id = self._validate_token_format(self.current_token)
-        if not user_id:
-            self.current_token = None  # 清除无效token
-            return None
-        
-        # 验证数据库中的会话
-        validated_user_id = self.db_manager.validate_session(self.current_token)
-        if not validated_user_id:
-            self.current_token = None  # 清除过期token
-            return None
-        
-        return validated_user_id
+        return self.current_user_id
     
     def get_current_username(self):
         """
@@ -211,18 +118,6 @@ class AuthManager:
         """
         return self.username
     
-    # def get_user_info(self):
-    #     """
-    #     获取当前登录用户的信息
-        
-    #     Returns:
-    #         用户信息字典或None
-    #     """
-    #     if not self.current_user_id:
-    #         return None
-        
-    #     return self.db_manager.get_user_info(self.current_user_id)
-
     def get_user_info(self):
         """
         获取当前登录用户的信息
@@ -230,11 +125,10 @@ class AuthManager:
         Returns:
             用户信息字典或None
         """
-        user_id = self.get_current_user_id()
-        if not user_id:
+        if not self.current_user_id:
             return None
         
-        return self.db_manager.get_user_info(user_id)
+        return self.db_manager.get_user_info(self.current_user_id)
     
     def validate_password_strength(self, password):
         """
