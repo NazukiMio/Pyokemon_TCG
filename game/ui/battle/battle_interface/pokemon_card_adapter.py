@@ -94,7 +94,7 @@ class PokemonCardGraphics(AbstractCardGraphics):
             scale = min(scale_x, scale_y)
             
             # 🔧 增加显示尺寸：适当放大缩放比例
-            scale = min(scale * 1.3, 1.0)  # 增加30%但不超过原尺寸
+            # scale = min(scale * 1.3, 1.0)  # 增加30%但不超过原尺寸
             
             # 计算缩放后的尺寸
             scaled_width = int(image_rect.width * scale)

@@ -74,8 +74,6 @@ class MainScene:
 
         self.dex_page = None
 
-        self.battle_page = None
-
         # 确保数据库管理器已初始化（可选，因为HomePage会处理）
         # 如果需要在MainScene层面访问数据库，可以添加：
         self.db_manager = DatabaseManager()
@@ -279,19 +277,9 @@ class MainScene:
                 #     self.dex_page.show_ui_elements()
 
             elif nav_id == 'battle':
-                # 切换到战斗页面
-                self.current_page = nav_id
-                if not self.battle_page:
-                    success = self._create_battle_page()
-                    if not success:
-                        print("❌ 创建战斗页面失败，返回主页")
-                        self.nav_bar.set_active('home')
-                        self.current_page = 'home'
-                        return
-                
-                # 关闭主页的所有窗口
-                self.home_page.close_all_windows()
-                print("   ⚔️ 战斗页面 - 卡组构建和对战准备")
+                # 切换到战斗场景
+                if self.callback:
+                    self.callback("battle")
             # 其他页面暂时保持在当前场景内显示占位符
             
             page_descriptions = {
@@ -384,29 +372,16 @@ class MainScene:
         
         elif event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
-                # ESC键处理：优先让当前页面处理
-                esc_handled = False
-                
-                if self.current_page == 'battle' and self.battle_page:
-                    # 如果在战斗页面，让战斗页面先处理ESC
-                    print("🎮 战斗页面处理ESC键")
-                    # 不在这里处理，让后面的页面事件处理逻辑来处理
-                    esc_handled = False  # 标记为未处理，让后面的逻辑处理
-                elif self.current_page == 'home':
-                    # 在主页时检查是否有弹出窗口
-                    has_windows = any(window and window.is_visible 
-                                    for window in self.home_page.active_windows.values())
-                    if has_windows:
-                        self.home_page.close_all_windows()
-                        print("🚪 ESC - 关闭所有弹出窗口")
-                        esc_handled = True
-                
-                # 如果没有被处理，且不在特殊页面，则退出游戏
-                if not esc_handled and self.current_page == 'home':
+                # ESC键：先尝试关闭窗口，如果没有窗口则退出
+                has_windows = any(window and window.is_visible 
+                                for window in self.home_page.active_windows.values())
+                if has_windows:
+                    self.home_page.close_all_windows()
+                    print("🚪 ESC - 关闭所有弹出窗口")
+                else:
                     if self.callback:
                         self.callback("exit")
                     print("🚪 ESC - 退出程序")
-                    return True  # 添加return防止继续处理
             
             elif event.key == pygame.K_F11:
                 pygame.display.toggle_fullscreen()
@@ -469,10 +444,6 @@ class MainScene:
             # 调整DexPage大小
             if self.dex_page:
                 self.dex_page.resize(self.screen_width, self.screen_height)
-
-            # 调整BattlePage大小
-            if self.battle_page:
-                self.battle_page.resize(self.screen_width, self.screen_height)
             
             # 更新缩放因子
             self.scale_factor = min(self.screen_width / 1920, self.screen_height / 1080)
@@ -483,11 +454,7 @@ class MainScene:
             print(f"📐 窗口调整: {self.screen_width}x{self.screen_height}")
         
         # 导航栏事件处理
-        nav_result = None
-        if not self._should_hide_navbar():
-            nav_result = self.nav_bar.handle_event(event)
-        else:
-            print("🎮 战斗场景中，忽略导航栏事件")
+        nav_result = self.nav_bar.handle_event(event)
         
         # 初始化UI结果
         ui_result = None
@@ -533,34 +500,6 @@ class MainScene:
                     self.nav_bar.set_active('home')
                     self.current_page = 'home'
 
-        elif self.current_page == 'battle':
-            if self.battle_page:
-                try:
-                    result = self.battle_page.handle_event(event)
-                    
-                    # 检查是否从战斗场景返回到战斗页面
-                    if result == "back_to_battle_page":
-                        print("🔙 从战斗场景返回战斗页面")
-                        # 这时应该重新显示navbar
-                        return True
-                        
-                    # 处理从战斗页面返回主页
-                    elif result == "back_to_home":
-                        self.nav_bar.set_active('home')
-                        self.current_page = 'home'
-                        print("🏠 从战斗页面返回主页")
-                        return True
-                        
-                    elif result:
-                        print(f"🎮 战斗页面事件结果: {result}")
-                        return True
-                        
-                except Exception as e:
-                    print(f"❌ 战斗页面事件处理异常: {e}")
-                    self.nav_bar.set_active('home')
-                    self.current_page = 'home'
-                    return True
-
         return True
     
     def update(self, dt):
@@ -580,14 +519,6 @@ class MainScene:
             if self.dex_page:
                 self.dex_page.update(dt)
 
-        # 更新战斗页面（如果存在）
-        elif self.current_page == 'battle':
-            if self.battle_page:
-                try:
-                    self.battle_page.update(dt)
-                except Exception as e:
-                    print(f"❌ 战斗页面更新异常: {e}")
-
         # 更新消息管理器
         self.message_manager.update(dt)
         
@@ -599,11 +530,6 @@ class MainScene:
     
     def draw(self):
         """绘制场景"""
-        # 调试信息
-        if self.battle_page and hasattr(self.battle_page, 'current_state'):
-            battle_state = self.battle_page.current_state
-            if battle_state != "lobby":
-                print(f"🎮 [调试] 战斗页面状态: {battle_state}")
         # 获取实际的时间增量
         current_time = pygame.time.get_ticks() / 1000.0
         if not hasattr(self, 'last_time'):
@@ -635,23 +561,11 @@ class MainScene:
             # 绘制图鉴页面
             if self.dex_page:
                 self.dex_page.draw(self.screen)
-        elif self.current_page == 'battle':
-            # 绘制战斗页面
-            if self.battle_page:
-                try:
-                    self.battle_page.draw(self.screen)
-                except Exception as e:
-                    print(f"❌ 战斗页面绘制异常: {e}")
-                    # 绘制错误信息
-                    font = pygame.font.Font(None, 36)
-                    error_text = f"战斗页面错误: {str(e)[:30]}..."
-                    text_surface = font.render(error_text, True, (255, 100, 100))
-                    self.screen.blit(text_surface, (50, 50))
         else:
             # 绘制其他页面的占位内容
             page_names = {
                 'social': 'Social',
-                # 'battle': 'Batalla', 
+                'battle': 'Batalla', 
                 'menu': 'Menú'
             }
             page_name = page_names.get(self.current_page, self.current_page)
@@ -659,12 +573,9 @@ class MainScene:
         
         # # 绘制导航栏（始终在最上层）
         # self.nav_bar.draw(self.screen)
-        # 绘制导航栏（根据条件判断）
-        should_hide_navbar = self._should_hide_navbar()
-        if not pack_window_visible and not should_hide_navbar:
+        # 绘制导航栏（只有在没有开包窗口时）
+        if not pack_window_visible:
             self.nav_bar.draw(self.screen)
-        elif should_hide_navbar:
-            print("🎮 战斗场景中，隐藏导航栏")
         
         
         # 绘制消息
@@ -692,125 +603,12 @@ class MainScene:
                     if element and element.alive():
                         element.hide()
 
-        # 控制BattlePage UI可见性
-        if self.battle_page:
-            if self.current_page == 'battle':
-                # 显示BattlePage UI元素
-                if hasattr(self.battle_page, 'deck_builder_button') and self.battle_page.deck_builder_button:
-                    self.battle_page.deck_builder_button.show()
-                if hasattr(self.battle_page, 'battle_prep_button') and self.battle_page.battle_prep_button:
-                    self.battle_page.battle_prep_button.show()
-            else:
-                # 隐藏BattlePage UI元素
-                if hasattr(self.battle_page, 'deck_builder_button') and self.battle_page.deck_builder_button:
-                    self.battle_page.deck_builder_button.hide()
-                if hasattr(self.battle_page, 'battle_prep_button') and self.battle_page.battle_prep_button:
-                    self.battle_page.battle_prep_button.hide()
-
         # 绘制pygame-gui界面
         # self.ui_manager.draw_ui(self.screen)
-        # 绘制pygame-gui界面（根据条件判断）
-        should_hide_navbar = self._should_hide_navbar()
-        if not pack_window_visible and not should_hide_navbar:
+        # 绘制pygame-gui界面（只有在没有开包窗口时）
+        if not pack_window_visible:
             self.ui_manager.draw_ui(self.screen)
-        elif should_hide_navbar:
-            # 在战斗场景中，可能需要不同的UI渲染逻辑
-            # BattleInterface有自己的UI渲染
-            pass
-
-    def _create_battle_page(self):
-        """创建战斗页面（懒加载）"""
-        print("⚔️ 正在创建战斗页面...")
-        
-        try:
-            from game.scenes.battle_page import BattlePage
-            
-            self.battle_page = BattlePage(
-                screen_width=self.screen_width,
-                screen_height=self.screen_height,
-                ui_manager=self.ui_manager,
-                game_manager=self.game_manager,
-                nav_height=self.nav_bar.height
-            )
-            
-            # 设置战斗页面回调
-            self._setup_battle_page_callbacks()
-
-            if self.current_page != 'battle':
-                self._hide_battle_page_ui()
-            
-            print("✅ 战斗页面创建成功")
-            return True
-            
-        except ImportError as e:
-            print(f"❌ 导入战斗页面失败: {e}")
-            return False
-        except Exception as e:
-            print(f"❌ 创建战斗页面异常: {e}")
-            import traceback
-            traceback.print_exc()
-            return False
-        
-    def _hide_battle_page_ui(self):
-        """隐藏战斗页面UI元素"""
-        if not self.battle_page:
-            return
-            
-        ui_elements = ['deck_builder_button', 'battle_prep_button']
-        for element_name in ui_elements:
-            if hasattr(self.battle_page, element_name):
-                element = getattr(self.battle_page, element_name)
-                if element and hasattr(element, 'hide'):
-                    element.hide()
-
-    def _setup_battle_page_callbacks(self):
-        """设置战斗页面回调"""
-        if not self.battle_page:
-            return
-        
-        # 设置返回主页回调
-        def on_battle_page_back():
-            print("🏠 战斗页面请求返回主页")
-            self.nav_bar.set_active('home')
-            self.current_page = 'home'
-        
-        # 战斗开始回调
-        def on_battle_started(battle_id):
-            print(f"🎮 战斗开始: {battle_id}")
-            # 可以在这里添加额外的战斗开始逻辑
-        
-        # 战斗结束回调
-        def on_battle_ended(battle_result):
-            print(f"🏁 战斗结束: {battle_result}")
-            # 可以在这里处理战斗结果
-        
-        # 设置回调（如果BattlePage支持的话）
-        if hasattr(self.battle_page, 'on_battle_started'):
-            self.battle_page.on_battle_started = on_battle_started
-        
-        # 注意：BattlePage可能没有直接的返回主页回调
-        # 这需要通过其他方式实现，比如在handle_event中检查特定返回值
     
-    def _is_in_battle_scene(self):
-        """检查是否在实际战斗场景中（不是战斗页面）"""
-        if not self.battle_page:
-            return False
-        
-        # 检查BattlePage是否处于战斗界面状态
-        if hasattr(self.battle_page, 'current_state'):
-            return self.battle_page.current_state == "battle_interface"
-        
-        # 或者检查是否有活跃的战斗界面
-        if hasattr(self.battle_page, 'battle_interface'):
-            return self.battle_page.battle_interface is not None
-        
-        return False
-
-    def _should_hide_navbar(self):
-        """判断是否应该隐藏导航栏"""
-        # 在实际战斗场景中隐藏导航栏
-        return self._is_in_battle_scene()
-
     def cleanup(self):
         """清理资源"""
         print("🧹 清理主场景资源...")
@@ -823,11 +621,6 @@ class MainScene:
             
         # if self.dex_page:
         #     self.dex_page.hide_ui_elements()
-
-        # 清理战斗页面
-        if self.battle_page and hasattr(self.battle_page, 'cleanup'):
-            self.battle_page.cleanup()
-            self.battle_page = None
         
         if hasattr(self.nav_bar, 'cleanup'):
             self.nav_bar.cleanup()

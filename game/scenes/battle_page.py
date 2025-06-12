@@ -405,6 +405,15 @@ class BattlePage:
                 
                 # ✅ 重要：等待界面完全初始化
                 self._wait_for_interface_ready()
+
+            # ✅ 在此处销毁原始UI按钮
+            if self.deck_builder_button:
+                self.deck_builder_button.kill()
+                self.deck_builder_button = None
+
+            if self.battle_prep_button:
+                self.battle_prep_button.kill()
+                self.battle_prep_button = None
                 
             else:
                 print("❌ [battle_page.py] 未找到battle_id")
@@ -924,6 +933,9 @@ class BattlePage:
             # 返回战斗准备状态
             self.current_state = "battle_prep"
             print("✅ [battle_page.py] 已返回战斗准备状态")
+
+            # ✅ 重建按钮
+            self._create_ui_elements()
 
         except Exception as e:
             print(f"❌ [battle_page.py] 退出战斗界面失败: {e}")

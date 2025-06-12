@@ -9,6 +9,7 @@
 import pygame
 import os
 import time
+import threading
 from typing import Dict, List, Optional, Callable
 from pygame_cards.board import GameBoard, GameBoardGraphic
 from pygame_cards.hands import AlignedHand, VerticalPileGraphic
@@ -161,13 +162,13 @@ class FixedPokemonFieldGraphic(VerticalPileGraphic):
     """修复的Pokemon场地图形类"""
     
     def __init__(self, cardset: CardsSet, title: str = "", is_enemy: bool = False):
-        super().__init__(cardset, size=(150, 200))
+        super().__init__(cardset, size=(90, 126))
         self.title = title
         self.is_enemy = is_enemy
         
         # 字体
         try:
-            self.title_font = pygame.font.SysFont("arial", 14, bold=True)
+            self.title_font = pygame.font.SysFont("notosansregular", 14, bold=True)
         except:
             self.title_font = pygame.font.Font(None, 14)
     
@@ -262,9 +263,9 @@ class BattleControlPanel:
         
         # 字体
         try:
-            self.title_font = pygame.font.SysFont("arial", 16, bold=True)
-            self.button_font = pygame.font.SysFont("arial", 14, bold=True)
-            self.info_font = pygame.font.SysFont("arial", 12)
+            self.title_font = pygame.font.SysFont("notosansregular", 16, bold=True)
+            self.button_font = pygame.font.SysFont("notosansregular", 14, bold=True)
+            self.info_font = pygame.font.SysFont("notosansregular", 12)
         except:
             self.title_font = pygame.font.Font(None, 16)
             self.button_font = pygame.font.Font(None, 14)
@@ -480,51 +481,51 @@ class FixedPokemonBattleBoard(GameBoard):
         ]
     
     def _create_board_graphics(self):
-        """创建游戏板图形"""
-        # 使用游戏区域宽度而不是全屏宽度
+        """创建游戏板图形 - 根据1280x720实测数据修正百分比"""
+        
+        # 🎯 根据实测坐标计算的精确百分比（基于1280x720）
         cardsets_abs_pos = {
-            # 对手区域（上方）
-            self.opponent_hand: (int(0.05 * self.game_area_width), int(0.02 * self.screen_height)),
-            self.opponent_deck: (int(0.05 * self.game_area_width), int(0.15 * self.screen_height)),
-            self.opponent_bench_1: (int(0.2 * self.game_area_width), int(0.15 * self.screen_height)),
-            self.opponent_bench_2: (int(0.32 * self.game_area_width), int(0.15 * self.screen_height)),
-            self.opponent_bench_3: (int(0.44 * self.game_area_width), int(0.15 * self.screen_height)),
-            self.opponent_discard: (int(0.56 * self.game_area_width), int(0.15 * self.screen_height)),
-            self.opponent_active: (int(0.38 * self.game_area_width), int(0.3 * self.screen_height)),
+            # 🔴 对手区域（上方）
+            self.opponent_deck: (int(0.052 * self.game_area_width), int(0.145 * self.screen_height)),      # x58 y100
+            self.opponent_bench_1: (int(0.235 * self.game_area_width), int(0.055 * self.screen_height)),  # x250 y35
+            self.opponent_bench_2: (int(0.403 * self.game_area_width), int(0.055 * self.screen_height)),  # x422 y35
+            self.opponent_bench_3: (int(0.565 * self.game_area_width), int(0.055 * self.screen_height)),  # x600 y35
+            self.opponent_active: (int(0.403 * self.game_area_width), int(0.251 * self.screen_height)),    # x422 y178
+            self.opponent_discard: (int(0.770 * self.game_area_width), int(0.145 * self.screen_height)),  # x814 y100
             
-            # 我方区域（下方）
-            self.player_active: (int(0.38 * self.game_area_width), int(0.5 * self.screen_height)),
-            self.player_discard: (int(0.05 * self.game_area_width), int(0.65 * self.screen_height)),
-            self.player_bench_1: (int(0.15 * self.game_area_width), int(0.65 * self.screen_height)),
-            self.player_bench_2: (int(0.25 * self.game_area_width), int(0.65 * self.screen_height)),
-            self.player_bench_3: (int(0.35 * self.game_area_width), int(0.65 * self.screen_height)),
-            self.player_deck: (int(0.55 * self.game_area_width), int(0.65 * self.screen_height)),
-            self.player_hand: (int(0.05 * self.game_area_width), int(0.82 * self.screen_height))
+            # 🔵 我方区域（下方）
+            self.player_discard: (int(0.052 * self.game_area_width), int(0.671 * self.screen_height)),    # x58 y479
+            self.player_bench_1: (int(0.235 * self.game_area_width), int(0.770 * self.screen_height)),    # x250 y550
+            self.player_bench_2: (int(0.403 * self.game_area_width), int(0.770 * self.screen_height)),    # x422 y550
+            self.player_bench_3: (int(0.565 * self.game_area_width), int(0.770 * self.screen_height)),    # x600 y550
+            self.player_active: (int(0.403 * self.game_area_width), int(0.567 * self.screen_height)),      # x422 y407
+            self.player_deck: (int(0.770 * self.game_area_width), int(0.671 * self.screen_height)),        # x814 y479
+            
+            # 🃏 手牌区域（调整位置让部分在窗口外）
+            self.opponent_hand: (int(0.1 * self.game_area_width), int(-0.08 * self.screen_height)),        # 上半部分窗口外
+            self.player_hand: (int(0.1 * self.game_area_width), int(0.92 * self.screen_height))            # 下半部分窗口外
         }
         
+        # 🎯 统一格子大小（86x120像素的百分比）
         cardsets_abs_size = {
-            # 🔧 修复：增加手牌区域高度
-            self.player_hand: (int(0.6 * self.game_area_width), int(0.20 * self.screen_height)),  # 从0.15增加到0.20
-            self.opponent_hand: (int(0.6 * self.game_area_width), int(0.12 * self.screen_height)),
+            # 所有战斗区域统一使用86x120对应的百分比
+            self.opponent_deck: (int(0.067 * self.game_area_width), int(0.170 * self.screen_height)),
+            self.opponent_bench_1: (int(0.067 * self.game_area_width), int(0.170 * self.screen_height)),
+            self.opponent_bench_2: (int(0.067 * self.game_area_width), int(0.170 * self.screen_height)),
+            self.opponent_bench_3: (int(0.067 * self.game_area_width), int(0.170 * self.screen_height)),
+            self.opponent_active: (int(0.067 * self.game_area_width), int(0.170 * self.screen_height)),
+            self.opponent_discard: (int(0.067 * self.game_area_width), int(0.170 * self.screen_height)),
             
-            # 🔧 修复：增加战斗位尺寸
-            self.player_active: (int(0.18 * self.game_area_width), int(0.24 * self.screen_height)),  # 从0.14x0.18增加到0.18x0.24
-            self.opponent_active: (int(0.18 * self.game_area_width), int(0.24 * self.screen_height)),
+            self.player_deck: (int(0.067 * self.game_area_width), int(0.170 * self.screen_height)),
+            self.player_bench_1: (int(0.067 * self.game_area_width), int(0.170 * self.screen_height)),
+            self.player_bench_2: (int(0.067 * self.game_area_width), int(0.170 * self.screen_height)),
+            self.player_bench_3: (int(0.067 * self.game_area_width), int(0.170 * self.screen_height)),
+            self.player_active: (int(0.067 * self.game_area_width), int(0.170 * self.screen_height)),
+            self.player_discard: (int(0.067 * self.game_area_width), int(0.170 * self.screen_height)),
             
-            # 🔧 修复：增加备战区尺寸
-            self.player_bench_1: (int(0.10 * self.game_area_width), int(0.15 * self.screen_height)),  # 从0.08x0.12增加到0.10x0.15
-            self.player_bench_2: (int(0.10 * self.game_area_width), int(0.15 * self.screen_height)),
-            self.player_bench_3: (int(0.10 * self.game_area_width), int(0.15 * self.screen_height)),
-            
-            self.opponent_bench_1: (int(0.12 * self.game_area_width), int(0.15 * self.screen_height)),  # 从0.10x0.12增加到0.12x0.15
-            self.opponent_bench_2: (int(0.12 * self.game_area_width), int(0.15 * self.screen_height)),
-            self.opponent_bench_3: (int(0.12 * self.game_area_width), int(0.15 * self.screen_height)),
-            
-            # 卡组和弃牌堆保持不变
-            self.player_deck: (int(0.08 * self.game_area_width), int(0.12 * self.screen_height)),
-            self.player_discard: (int(0.08 * self.game_area_width), int(0.12 * self.screen_height)),
-            self.opponent_deck: (int(0.08 * self.game_area_width), int(0.12 * self.screen_height)),
-            self.opponent_discard: (int(0.08 * self.game_area_width), int(0.12 * self.screen_height))
+            # 手牌区域（横向展开容纳多张卡）
+            self.opponent_hand: (int(0.8 * self.game_area_width), int(0.170 * self.screen_height)),
+            self.player_hand: (int(0.8 * self.game_area_width), int(0.170 * self.screen_height))
         }
 
         return GameBoardGraphic(
@@ -576,15 +577,23 @@ class BattleInterface:
         # 添加卡牌区域到管理器
         self._setup_cards_manager()
         
+        # 🔧 添加更新锁防止并发冲突
+        self._updating_state = False
+
+        # 🔧 添加调试模式
+        self.debug_mode = False  # 按 D 键切换
+        self.show_ruler = False  # 按 R 键切换标尺
+        self.mouse_pos = (0, 0)  # 鼠标位置
+
         # 状态
         self.battle_state = None
         self.last_update_time = 0
 
         # 字体
         try:
-            self.title_font = pygame.font.SysFont("arial", 24, bold=True)
-            self.info_font = pygame.font.SysFont("arial", 16)
-            self.small_font = pygame.font.SysFont("arial", 12)
+            self.title_font = pygame.font.SysFont("notosansregular", 24, bold=True)
+            self.info_font = pygame.font.SysFont("notosansregular", 16)
+            self.small_font = pygame.font.SysFont("notosansregular", 12)
         except:
             self.title_font = pygame.font.Font(None, 24)
             self.info_font = pygame.font.Font(None, 16)
@@ -595,6 +604,196 @@ class BattleInterface:
         
         print("✅ 修复版Pokemon TCG战斗界面创建成功")
     
+    # 调试界面ui布局内容
+    def toggle_debug_mode(self):
+        """切换调试模式"""
+        self.debug_mode = not self.debug_mode
+        print(f"🔍 调试模式: {'开启' if self.debug_mode else '关闭'}")
+
+    def toggle_ruler(self):
+        """切换标尺显示"""
+        self.show_ruler = not self.show_ruler
+        print(f"📏 标尺显示: {'开启' if self.show_ruler else '关闭'}")
+
+    def update_mouse_pos(self, pos):
+        """更新鼠标位置"""
+        self.mouse_pos = pos
+
+    def draw_debug_overlay(self, screen):
+        """绘制调试信息覆盖层"""
+        if not self.debug_mode:
+            return
+        
+        import pygame
+        
+        # 创建半透明覆盖层
+        overlay = pygame.Surface((screen.get_width(), screen.get_height()))
+        overlay.set_alpha(128)
+        overlay.fill((0, 0, 0))
+        
+        # 字体
+        try:
+            font = pygame.font.Font(None, 24)
+            small_font = pygame.font.Font(None, 18)
+        except:
+            font = pygame.font.SysFont('Arial', 24)
+            small_font = pygame.font.SysFont('Arial', 18)
+        
+        # 📏 绘制网格标尺
+        if self.show_ruler:
+            self._draw_ruler_grid(screen, font)
+        
+        # 🎯 绘制战斗区域边界
+        self._draw_battle_areas_bounds(screen, font)
+        
+        # 🃏 绘制卡牌信息
+        self._draw_cards_info(screen, small_font)
+        
+        # 🖱️ 显示鼠标坐标和区域信息
+        self._draw_mouse_info(screen, font)
+        
+        # 📊 显示总体布局信息
+        self._draw_layout_info(screen, font)
+
+    def _draw_ruler_grid(self, screen, font):
+        """绘制标尺网格"""
+        import pygame
+        
+        width, height = screen.get_size()
+        
+        # 绘制垂直线（每100像素）
+        for x in range(0, width, 100):
+            pygame.draw.line(screen, (0, 255, 0), (x, 0), (x, height), 1)
+            # 标注坐标
+            text = font.render(str(x), True, (0, 255, 0))
+            screen.blit(text, (x + 2, 2))
+        
+        # 绘制水平线（每100像素）
+        for y in range(0, height, 100):
+            pygame.draw.line(screen, (0, 255, 0), (0, y), (width, y), 1)
+            # 标注坐标
+            text = font.render(str(y), True, (0, 255, 0))
+            screen.blit(text, (2, y + 2))
+
+    def _draw_battle_areas_bounds(self, screen, font):
+        """绘制战斗区域边界框"""
+        import pygame
+        
+        areas = [
+            ("玩家手牌", self.game_board.player_hand, (255, 255, 0)),
+            ("玩家前排", self.game_board.player_active, (255, 0, 0)),
+            ("玩家后备1", self.game_board.player_bench1, (255, 100, 100)),
+            ("玩家后备2", self.game_board.player_bench2, (255, 100, 100)),
+            ("玩家后备3", self.game_board.player_bench3, (255, 100, 100)),
+            ("玩家后备4", self.game_board.player_bench4, (255, 100, 100)),
+            ("玩家后备5", self.game_board.player_bench5, (255, 100, 100)),
+            ("玩家卡组", self.game_board.player_deck, (0, 255, 255)),
+            ("对手手牌", self.game_board.opponent_hand, (255, 255, 0)),
+            ("对手前排", self.game_board.opponent_active, (255, 0, 0)),
+            ("对手后备1", self.game_board.opponent_bench1, (255, 100, 100)),
+            ("对手后备2", self.game_board.opponent_bench2, (255, 100, 100)),
+            ("对手后备3", self.game_board.opponent_bench3, (255, 100, 100)),
+            ("对手后备4", self.game_board.opponent_bench4, (255, 100, 100)),
+            ("对手后备5", self.game_board.opponent_bench5, (255, 100, 100)),
+            ("对手卡组", self.game_board.opponent_deck, (0, 255, 255)),
+        ]
+        
+        for name, cardset, color in areas:
+            if hasattr(cardset, 'rect'):
+                rect = cardset.rect
+                # 绘制边界框
+                pygame.draw.rect(screen, color, rect, 2)
+                # 显示区域信息
+                info_text = f"{name}: ({rect.x},{rect.y}) {rect.width}x{rect.height}"
+                text_surface = font.render(info_text, True, color)
+                screen.blit(text_surface, (rect.x, rect.y - 25))
+
+    def _draw_cards_info(self, screen, font):
+        """绘制卡牌详细信息"""
+        import pygame
+        
+        y_offset = 10
+        
+        # 获取所有区域的卡牌
+        all_areas = [
+            ("玩家手牌", self.game_board.player_hand),
+            ("玩家前排", self.game_board.player_active),
+            ("对手前排", self.game_board.opponent_active),
+        ]
+        
+        for area_name, cardset in all_areas:
+            if len(cardset) > 0:
+                for i, card in enumerate(cardset):
+                    if hasattr(card, 'rect'):
+                        # 绘制卡牌边界
+                        pygame.draw.rect(screen, (255, 255, 255), card.rect, 1)
+                        
+                        # 显示卡牌信息
+                        card_info = f"{area_name}[{i}]: {card.name} ({card.rect.x},{card.rect.y}) {card.rect.width}x{card.rect.height}"
+                        text_surface = font.render(card_info, True, (255, 255, 255))
+                        screen.blit(text_surface, (10, y_offset))
+                        y_offset += 20
+
+    def _draw_mouse_info(self, screen, font):
+        """显示鼠标信息"""
+        import pygame
+        
+        mouse_text = f"鼠标: ({self.mouse_pos[0]}, {self.mouse_pos[1]})"
+        
+        # 检测鼠标在哪个区域
+        current_area = "无"
+        areas = [
+            ("玩家手牌", self.game_board.player_hand),
+            ("玩家前排", self.game_board.player_active),
+            ("对手前排", self.game_board.opponent_active),
+            ("玩家卡组", self.game_board.player_deck),
+            ("对手卡组", self.game_board.opponent_deck),
+        ]
+        
+        for name, cardset in areas:
+            if hasattr(cardset, 'rect') and cardset.rect.collidepoint(self.mouse_pos):
+                current_area = name
+                break
+        
+        area_text = f"当前区域: {current_area}"
+        
+        # 显示信息
+        mouse_surface = font.render(mouse_text, True, (255, 255, 0))
+        area_surface = font.render(area_text, True, (255, 255, 0))
+        
+        screen.blit(mouse_surface, (screen.get_width() - 250, 10))
+        screen.blit(area_surface, (screen.get_width() - 250, 35))
+
+    def _draw_layout_info(self, screen, font):
+        """显示总体布局信息"""
+        import pygame
+        
+        layout_info = [
+            f"屏幕尺寸: {screen.get_width()} x {screen.get_height()}",
+            f"战斗界面: {self.screen_width} x {self.screen_height}",
+            f"调试模式: {self.debug_mode} (按D切换)",
+            f"标尺显示: {self.show_ruler} (按R切换)",
+            "",
+            "操作说明:",
+            "D - 切换调试模式",
+            "R - 切换标尺显示",
+            "鼠标移动查看区域信息"
+        ]
+        
+        y_start = screen.get_height() - len(layout_info) * 25 - 10
+        
+        for i, info in enumerate(layout_info):
+            text_surface = font.render(info, True, (255, 255, 255))
+            screen.blit(text_surface, (10, y_start + i * 25))
+
+    def handle_debug_keys(self, event):
+        """处理调试按键"""
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_d:
+                self.toggle_debug_mode()
+            elif event.key == pygame.K_r:
+                self.toggle_ruler()
+
     def _wait_for_battle_ready(self):
         """等待战斗控制器准备完成"""
         if not self.battle_controller or not self.battle_controller.current_battle:
@@ -641,7 +840,7 @@ class BattleInterface:
             self.game_board.opponent_hand,
             visible=False,
             card_back="assets/images/item/card_back.png",
-            size=(int(self.game_board.game_area_width * 0.6), int(self.screen_height * 0.1))
+            size=(int(self.game_board.game_area_width * 0.6), int(self.screen_height * 0.15))
         )
         
         # 卡组 - 使用修复的卡背
@@ -649,25 +848,25 @@ class BattleInterface:
             self.game_board.player_deck,
             visible=False,
             card_back="assets/images/item/card_back.png",
-            size=(80, 120)
+            size=(90, 126)
         )
         
         self.game_board.opponent_deck.graphics = FixedDeck(
             self.game_board.opponent_deck,
             visible=False,
             card_back="assets/images/item/card_back.png",
-            size=(80, 120)
+            size=(90, 126)
         )
         
         # 弃牌堆
         self.game_board.player_discard.graphics = VerticalPileGraphic(
             self.game_board.player_discard,
-            size=(80, 120)
+            size=(90, 126)
         )
         
         self.game_board.opponent_discard.graphics = VerticalPileGraphic(
             self.game_board.opponent_discard,
-            size=(80, 120)
+            size=(90, 126)
         )
         
         # 战斗位
@@ -894,6 +1093,10 @@ class BattleInterface:
     def _create_real_card_adapter(self, card_instance, area_name="Unknown"):
         """🔥 创建真实卡牌适配器，而不是占位符"""
         try:
+            if card_instance is None:
+                print(f"⚠️ [修复] card_instance为None，无法创建适配器 ({area_name})")
+                return None
+
             # 检查card_instance的结构
             if hasattr(card_instance, 'card'):
                 # 如果是带有.card属性的实例（如CardInstance）
@@ -945,6 +1148,7 @@ class BattleInterface:
     def _update_battle_state(self):
         """🔥 修复：更新战斗状态 - 使用真实数据"""
         try:
+            print(f"🔍 [调试] 开始更新战斗状态，当前线程: {threading.current_thread().name if 'threading' in globals() else 'unknown'}")
             if not self.battle_controller:
                 print("⚠️ [修复] 战斗控制器为None")
                 return
@@ -1027,10 +1231,14 @@ class BattleInterface:
         try:
             self.game_board.player_hand.clear()
             
-            for i, card_instance in enumerate(hand_cards[:7]):  # 最多显示7张
+            valid_hand_cards = [card for card in hand_cards if card is not None]
+
+            for i, card_instance in enumerate(valid_hand_cards[:7]):  # 最多显示7张
                 adapter = self._create_real_card_adapter(card_instance, f"hand_{i+1}")
-                if adapter:
+                if adapter is not None:
                     self.game_board.player_hand.append(adapter)
+                else:
+                    print(f"⚠️ [修复] 第{i+1}张手牌适配器创建失败，跳过")
                     
             print(f"✅ [修复] 手牌更新完成: {len(self.game_board.player_hand)} 张")
             
@@ -1042,13 +1250,21 @@ class BattleInterface:
     def _update_real_pokemon_area(self, cardset, pokemon_list, area_name):
         """🔥 更新真实Pokemon区域"""
         try:
-            cardset.clear()
+            if cardset and hasattr(cardset, 'clear'):
+                try:
+                    cardset.clear()
+                except Exception as e:
+                    print(f"⚠️ [修复] 清理卡牌区域时出错: {e}")
             
-            for pokemon_instance in pokemon_list:
+            valid_pokemon = [pokemon for pokemon in pokemon_list if pokemon is not None]
+
+            for pokemon_instance in valid_pokemon:
                 if pokemon_instance:
                     adapter = self._create_real_card_adapter(pokemon_instance, area_name)
-                    if adapter:
-                        cardset.append(adapter)
+                if adapter is not None:
+                    cardset.append(adapter)
+                else:
+                    print(f"⚠️ [修复] {area_name}适配器创建失败，跳过")
                         
             print(f"✅ [修复] {area_name}更新完成: {len(cardset)} 只Pokemon")
             
@@ -1057,6 +1273,8 @@ class BattleInterface:
     
     def _update_real_bench_pokemon(self, bench_pokemon):
         """🔥 更新真实后备区Pokemon"""
+        bench_pokemon = [pokemon for pokemon in bench_pokemon if pokemon is not None]
+
         bench_areas = [
             self.game_board.player_bench_1,
             self.game_board.player_bench_2,
@@ -1099,7 +1317,11 @@ class BattleInterface:
         """更新卡组显示（显示卡背）"""
         try:
             # 清空现有卡组
-            cardset.clear()
+            if cardset and hasattr(cardset, 'clear'):
+                try:
+                    cardset.clear()
+                except Exception as e:
+                    print(f"⚠️ [修复] 清理卡牌区域时出错: {e}")
             
             # 创建虚拟卡背来表示卡组
             if card_count > 0:
@@ -1237,7 +1459,11 @@ class BattleInterface:
         # 清理卡牌区域
         for cardset in cardsets_to_clear:
             try:
-                cardset.clear()
+                if cardset and hasattr(cardset, 'clear'):
+                    try:
+                        cardset.clear()
+                    except Exception as e:
+                        print(f"⚠️ [修复] 清理卡牌区域时出错: {e}")
             except Exception as e:
                 print(f"❌ 清理卡牌区域失败: {e}")
         
@@ -1357,7 +1583,11 @@ class BattleInterface:
         """安全地更新卡牌集合"""
         try:
             if not cards_data:
-                cardset.clear()
+                if cardset and hasattr(cardset, 'clear'):
+                    try:
+                        cardset.clear()
+                    except Exception as e:
+                        print(f"⚠️ [修复] 清理卡牌区域时出错: {e}")
                 return
             
             valid_cards = [card for card in cards_data if card is not None]
@@ -1366,17 +1596,29 @@ class BattleInterface:
                 new_cardset = convert_to_pokemon_cardsset(valid_cards, name)
                 self._update_cardset(cardset, new_cardset)
             else:
-                cardset.clear()
+                if cardset and hasattr(cardset, 'clear'):
+                    try:
+                        cardset.clear()
+                    except Exception as e:
+                        print(f"⚠️ [修复] 清理卡牌区域时出错: {e}")
                 
         except Exception as e:
             print(f"❌ 安全更新卡牌集合失败 {name}: {e}")
-            cardset.clear()
+            if cardset and hasattr(cardset, 'clear'):
+                try:
+                    cardset.clear()
+                except Exception as e:
+                    print(f"⚠️ [修复] 清理卡牌区域时出错: {e}")
     
     def _update_deck_display(self, cardset: CardsSet, card_count: int):
         """更新卡组显示（显示卡背）"""
         try:
             # 清空现有卡组
-            cardset.clear()
+            if cardset and hasattr(cardset, 'clear'):
+                try:
+                    cardset.clear()
+                except Exception as e:
+                    print(f"⚠️ [修复] 清理卡牌区域时出错: {e}")
             
             # 创建虚拟卡背来表示卡组
             if card_count > 0:
@@ -1419,6 +1661,15 @@ class BattleInterface:
                     self._handle_button_click(button_clicked)
                     return None
         
+        # 🔍 处理调试按键 - 新增部分
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_d:
+                self.debug_mode = not self.debug_mode
+                print(f"🔍 调试模式: {'开启' if self.debug_mode else '关闭'}")
+            elif event.key == pygame.K_r:
+                self.show_ruler = not self.show_ruler
+                print(f"📏 标尺显示: {'开启' if self.show_ruler else '关闭'}")
+
         # 只处理卡牌管理器事件
         if hasattr(self, 'cards_manager') and self.cards_manager:
             self.cards_manager.process_events(event)
@@ -1581,8 +1832,9 @@ class BattleInterface:
         """更新界面"""
         # 定期更新战斗状态
         self.last_update_time += dt
-        if self.last_update_time > 0.5:  # 每0.5秒更新一次
-            self._update_battle_state()
+        if self.last_update_time > 1.0:  # 每0.5秒更新一次
+            if not self._updating_state:  # 只在没有正在更新时才更新
+                self._update_battle_state()
             self.last_update_time = 0
         
         # 更新卡牌管理器
@@ -1629,6 +1881,11 @@ class BattleInterface:
         hint_surface = self.small_font.render(hint, True, (150, 150, 150))
         hint_rect = hint_surface.get_rect(centerx=self.game_board.game_area_width//2, y=self.screen_height-20)
         screen.blit(hint_surface, hint_rect)
+
+        if self.debug_mode:
+            self.draw_debug_overlay(screen)
+    
+        pygame.display.flip()
     
     def cleanup(self):
         """清理资源"""
