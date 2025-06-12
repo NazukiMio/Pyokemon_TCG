@@ -13,7 +13,7 @@ from typing import Dict, List, Any, Optional
 
 # 在文件开头的导入部分添加
 try:
-    from dex_page import DexPage
+    from game.scenes.dex_page import DexPage
 except ImportError:
     print("❌ 无法导入DexPage，请确保dex_page.py在同一目录")
     DexPage = None

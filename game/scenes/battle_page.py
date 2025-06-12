@@ -293,7 +293,7 @@ class BattlePage:
         """打开卡组构建窗口"""
         if self.active_windows['deck_builder'] is None:
             try:
-                from game.scenes.windows.battle.deck_builder.deck_builder_window import DeckBuilderWindow
+                # from game.scenes.windows.battle.deck_builder.deck_builder_window import DeckBuilderWindow
                 
                 # 创建窗口位置和大小
                 window_width = int(800 * self.scale_factor)
@@ -304,11 +304,11 @@ class BattlePage:
                 window_rect = pygame.Rect(window_x, window_y, window_width, window_height)
                 
                 # 创建卡组构建窗口
-                self.active_windows['deck_builder'] = DeckBuilderWindow(
-                    rect=window_rect,
-                    ui_manager=self.ui_manager,
-                    game_manager=self.game_manager
-                )
+                # self.active_windows['deck_builder'] = DeckBuilderWindow(
+                #     rect=window_rect,
+                #     ui_manager=self.ui_manager,
+                #     game_manager=self.game_manager
+                # )
                 
                 print("🏗️ 卡组构建窗口已打开")
                 self.current_state = "deck_building"
@@ -553,7 +553,7 @@ class BattlePage:
             except Exception as e:
                 print(f"❌ 导入修复版失败，尝试原版: {e}")
                 try:
-                    from game.ui.battle.battle_interface.new_battle_interface import BattleInterface
+                    from disabled.new_battle_interface import BattleInterface
                     print(f"✅ 使用原版BattleInterface")
                 except Exception as e2:
                     print(f"❌ 导入原版也失败: {e2}")

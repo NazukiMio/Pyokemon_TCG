@@ -368,7 +368,7 @@ class BattlePrepWindow(pygame_gui.elements.UIWindow):
         if self.selected_deck_type == "preset":
             print(f"🔍 [battle_prep_window.py] 加载预置卡组: {len(self.preset_decks)}个")
             for i, (deck_id, deck) in enumerate(self.preset_decks.items()):  # 注意这里改了
-                deck_text = f"{deck['name']} ({deck['theme']}) - {len(deck['card_ids'])}张卡"
+                deck_text = f"{deck['name']} ({deck['theme']}) - {len(deck['card_ids'])} cartas"
                 deck_items.append(deck_text)
                 # 存储映射关系：显示文本 -> (类型, 索引, 卡组ID, 卡组数据)
                 self.deck_mapping[deck_text] = ("preset", i, deck_id, deck)
@@ -380,7 +380,7 @@ class BattlePrepWindow(pygame_gui.elements.UIWindow):
                 deck_items.append("暂无可用的用户卡组")
             else:
                 for i, deck in enumerate(self.user_decks):
-                    deck_text = f"{deck['name']} - {deck['card_count']}张卡"
+                    deck_text = f"{deck['name']} - {deck['card_count']}cartas"
                     deck_items.append(deck_text)
                     # 存储映射关系
                     self.deck_mapping[deck_text] = ("user", i, deck['id'], deck)

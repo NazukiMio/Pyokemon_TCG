@@ -19,7 +19,7 @@ from pygame_cards.events import CARDSSET_CLICKED, CARD_MOVED
 from pygame_cards import constants
 
 # 导入我们的适配器
-from .pokemon_card_adapter import PokemonCardAdapter, convert_to_pokemon_cardsset
+from game.ui.battle.battle_interface.pokemon_card_adapter import PokemonCardAdapter, convert_to_pokemon_cardsset
 
 class PokemonCardsManager(CardsManager):
     def populate_from_state(self, battle_state):
@@ -64,7 +64,7 @@ class PokemonCardsManager(CardsManager):
         
         # 同时设置给PokemonCardAdapter
         try:
-            from .pokemon_card_adapter import PokemonCardAdapter
+            from game.ui.battle.battle_interface.pokemon_card_adapter import PokemonCardAdapter
             PokemonCardAdapter.battle_cache = cache
             print("✅ 战斗缓存已设置到PokemonCardAdapter")
         except Exception as e:
@@ -1069,7 +1069,7 @@ class BattleInterface:
         """创建占位卡牌"""
         try:
             from game.core.cards.card_data import Card
-            from .pokemon_card_adapter import PokemonCardAdapter
+            from game.ui.battle.battle_interface.pokemon_card_adapter import PokemonCardAdapter
             
             # ✅ 修复：提取正确的card_id
             instance_id = card_info.get('instance_id', 'placeholder')
