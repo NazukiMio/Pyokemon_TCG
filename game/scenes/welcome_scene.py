@@ -12,7 +12,7 @@ import os
 # 导入核心模块
 from game.scenes.components.message_component import MessageManager, ToastMessage
 from game.scenes.styles.theme import Theme
-from game.scenes.styles.fonts import font_manager
+from game.scenes.styles import fonts
 from game.utils.video_background import VideoBackground
 
 class WelcomeScene:
@@ -35,6 +35,9 @@ class WelcomeScene:
         # 创建pygame_gui主题并初始化UI管理器
         self.setup_pygame_gui()
         
+        # 初始化字体
+        fonts.font_manager = fonts.FontManager()
+
         # 组件管理器
         self.message_manager = MessageManager()
         
@@ -716,7 +719,7 @@ class WelcomeScene:
             font_size = int(24 * scale_factor)  # 24px基础大小
             
             # 使用智能渲染
-            text_surface = font_manager.render_text_smart(
+            text_surface = fonts.font_manager.render_text_smart(
                 self.intro_text, font_size, text_color, 'body'
             )
             
@@ -752,7 +755,7 @@ class WelcomeScene:
         else:
             # 文字标题作为后备
             title_color = Theme.get_color('text_white')
-            title_surface = font_manager.render_text(
+            title_surface = fonts.font_manager.render_text(
                 "Juego de Cartas", '2xl', screen_height, title_color
             )
             title_rect = title_surface.get_rect(center=(screen_width // 2, int(screen_height * 0.25)))
@@ -770,7 +773,7 @@ class WelcomeScene:
             # 副标题文字
             subtitle_text = "JUEGO DE CARTAS COLECCIONABLES"
             text_color = Theme.get_color('text_white')
-            text_surface = font_manager.render_text(subtitle_text, 'lg', screen_height, text_color)
+            text_surface = fonts.font_manager.render_text(subtitle_text, 'lg', screen_height, text_color)
             
             # 位置
             text_rect = text_surface.get_rect(center=(screen_width // 2, int(screen_height * 0.4)))
