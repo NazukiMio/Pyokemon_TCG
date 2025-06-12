@@ -997,9 +997,9 @@ class DatabaseManager:
                 self.connection.rollback()
         self.close()
     
-    # 会话管理方法
+    # gestion de la session
     def save_session(self, session_token, user_id, expires_at, ip_address=None):
-        """保存用户会话"""
+        """Guardar la sesión del usuario"""
         try:
             self.cursor.execute('''
             INSERT INTO user_sessions (user_id, session_token, expires_at, ip_address)
@@ -1008,11 +1008,11 @@ class DatabaseManager:
             self.connection.commit()
             return True
         except sqlite3.Error as e:
-            print(f"保存会话失败: {e}")
+            print(f"Guardar la sesión falló: {e}")
             return False
     
     def validate_session(self, session_token):
-        """验证会话token并返回用户ID"""
+        """Validar la sesión del usuario"""
         try:
             self.cursor.execute('''
             SELECT user_id FROM user_sessions 
@@ -1021,11 +1021,11 @@ class DatabaseManager:
             result = self.cursor.fetchone()
             return result[0] if result else None
         except sqlite3.Error as e:
-            print(f"验证会话失败: {e}")
+            print(f"Validar la sesión falló: {e}")
             return None
     
     def delete_session(self, session_token):
-        """删除会话（登出）"""
+        """Eliminar la sesión del usuario"""
         try:
             self.cursor.execute(
                 "UPDATE user_sessions SET is_active = 0 WHERE session_token = ?",
@@ -1034,11 +1034,11 @@ class DatabaseManager:
             self.connection.commit()
             return True
         except sqlite3.Error as e:
-            print(f"删除会话失败: {e}")
+            print(f"Eliminar la sesión falló: {e}")
             return False
     
     def cleanup_expired_sessions(self):
-        """清理过期会话"""
+        """Decomisionar las sesiones expiradas"""
         try:
             self.cursor.execute(
                 "UPDATE user_sessions SET is_active = 0 WHERE expires_at <= CURRENT_TIMESTAMP"
@@ -1046,7 +1046,7 @@ class DatabaseManager:
             self.connection.commit()
             return self.cursor.rowcount
         except sqlite3.Error as e:
-            print(f"清理过期会话失败: {e}")
+            print(f"Decomisionar las sesiones expiradas falló: {e}")
             return 0
         
     def __del__(self):

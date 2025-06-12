@@ -383,19 +383,19 @@ class DexPage:
         print(f"✅ DexPage初始化完成 - {len(self.all_cards)} 张卡牌")
     
     def _load_card_data(self):
-        """从缓存加载卡牌数据（性能优化）"""
+        """Cargar los datos de las cartas desde cache"""
         try:
             if self.game_manager:
                 current_version = self.game_manager.get_card_cache_version()
                 
-                # 检查是否需要重新加载
+                # Revisar si hay update de la cache
                 if self._cached_version != current_version:
-                    print(f"🔄 检测到卡牌缓存更新 (v{self._cached_version} → v{current_version})")
+                    print(f"Detecta update de la cache (v{self._cached_version} → v{current_version})")
                     self._cached_version = current_version
-                    # 清理CardDisplay对象池
+                    # Limpiar el pool de CardDisplay
                     self._card_displays_pool.clear()
                 else:
-                    print("✅ 使用卡牌缓存数据")
+                    print("Uso la cache existente (v{self._cached_version})")
                 
                 # 🆕 无论版本是否变化，都要确保有卡牌数据
                 self.all_cards = self.game_manager.get_cached_cards()
