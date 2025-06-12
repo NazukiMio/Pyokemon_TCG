@@ -1,128 +1,153 @@
-# Pyokemon TCG – Pokémon Card Game Simulator (Python/PyGame)
+# Pyokemon TCG Project Overview (Python/PyGame)
 
-This README is also available in 简体中文 [here](README_CN.md) and Español [here](README.md).
+(For the Chinese version, see [README_CN.md](README_CN.md). For the Spanish version, see [README_ES.md](README.md).)
 
-## Introduction
+## Project Introduction
 
-**Pyokemon TCG** is an educational, non-commercial Pokémon Trading Card Game simulator built with Python and PyGame. This project recreates the essence of the Pokémon TCG in a digital format as a learning exercise, demonstrating game architecture, turn-based logic, and use of public APIs. It is designed as a didactic tool – applying programming concepts from database management to GUI development – rather than a commercial game. By focusing on clean structure and documentation, Pyokemon TCG serves as both a playable prototype and a teaching resource for Python game development.
+**Pyokemon TCG** is a fan-made Pokémon Trading Card Game simulator developed using Python and PyGame, intended for educational and learning purposes. This is a non-official, non-commercial project aimed at helping beginners learn game development by replicating the core mechanics of the Pokémon TCG. Pyokemon TCG serves as a comprehensive teaching example, demonstrating how to build a complete game project including user login, GUI interfaces, turn-based logic, and API data retrieval. It adopts a modular architecture and clean coding practices, making it both playable and easy to understand — ideal for anyone learning Python game development.
 
-## Features Overview
+## Feature Overview
 
-- **User Registration & Login**: Create a local player profile with username/password, and manage authentication. User data (profile, progress) is stored in a local SQLite database.
+- **User Registration and Login**: A user account system allows new users to register and existing users to log in. User profiles and game progress are saved locally using an SQLite database. The login process is managed by `AuthManager`, which uses token-based authentication to ensure secure data exchange without manually passing user credentials between scenes.
+- ![Welcome Page](assets/images/markdown/welcome.png)
+- ![Login](assets/images/markdown/login.png)
+- ![Register](assets/images/markdown/register.png)
 
-- **Pokédex (Card Collection)**: View a graphical collection of Pokémon cards unlocked by the user. Cards are displayed in a gallery with filtering options, and an image caching system ensures smooth performance even with many cards.
+- **Card Pokédex**: A visual interface that displays all collected Pokémon cards. Players can browse card thumbnails and filter by ownership, rarity, type, and more. For performance optimization, image caching is implemented to ensure smooth rendering even with many cards displayed simultaneously.
+- ![Card Pokédex](assets/images/markdown/pokedex.png)
 
-- **Navigation & Scenes**: Move between game sections using a persistent navigation bar. The interface provides smooth transitions between the main menu, collection, store, battle setup, etc., implemented via a modular scene system.
+- **Interface Navigation and Scene Switching**: The game features a unified navigation bar allowing smooth transitions between major scenes like Home, Pokédex, Shop, and Battle Preparation. Typically located at the top or bottom of the window, the bar includes icon buttons for different modules. Each scene, such as login, main, or battle, is implemented as a self-contained module, ensuring decoupling and a fluid user experience.
+- ![Main Interface](assets/images/markdown/mainscene.png)
 
-- **Card Pack Opening**: Acquire new cards through an interactive booster pack opening system. Players can visit the in-game store to obtain card packs (using in-game currency) and open them with a visual “unwrapping” animation to reveal random cards.
+- **Pack Purchasing and Opening**: Simulates the experience of buying and opening Pokémon card packs. Players can purchase packs in the in-game **Shop** using virtual currency, then open them with animated effects. Clicking an unopened pack “tears” the wrapper and displays randomly obtained cards. This intuitive and engaging process mimics the thrill of real-world card opening.
+- ![Open Pack](assets/images/markdown/open_pack.png)
 
-- **Local Data Persistence**: All progress (unlocked cards, decks, achievements, etc.) is saved locally. The game uses SQLite to persist user profiles and collection data between sessions. This allows offline play once initial data is downloaded.
+- **Local Data Storage**: Game progress is stored locally, including user profiles, obtained cards, decks, and achievement stats, using SQLite. Card data is also cached in local JSON files, allowing the game to be played offline after the first setup. Fully localized storage ensures no persistent internet connection is needed.
 
-- **Card Import Tool**: An external `fetch_card_gui` utility is provided to populate the game’s card database with real card data. This tool fetches card information and images from the Pokémon TCG API and saves them into a local JSON and image set, with configurable rarity distribution.
+- **Card Crawler Tool**: A standalone card data fetching tool `fetch_card_gui` allows importing cards from the official Pokémon TCG API. With a simple GUI, users can set the number of cards to fetch and output location. The tool downloads card metadata and images, generating a local `cards.json` and image resources for the game. This allows educators and developers to easily update the game’s card pool.
+- ![Card Fetch Tool](assets/images/markdown/fetch_card_gui.png)
 
-- **Deck Building (In Development)**: A deck editor is planned for assembling custom decks from the player’s card collection. Players will be able to save multiple decks to use in battles.
+- **Deck Building (In Development)**: A deck editor is under development, enabling players to build and save custom decks using collected cards. Features will include card filtering, add/remove operations, and saving multiple deck profiles. This module is currently in progress.
 
-- **Turn-Based Battle (In Development)**: A local single-player battle system is being integrated, featuring turn-by-turn gameplay using `pygame-cards` for visual card interactions. The battle logic backend is functional, and a PyGame GUI frontend is in progress. Future updates will allow player vs AI matches entirely offline.
+- **Local Battle System (In Development)**: Plans include implementing a local 1v1 battle mode. Basic turn-based logic is completed and integration with GUI is ongoing. Using `pygame-cards` for visual card interactions and `pygame-gui` for actions like attacking or attaching energy, the modular design separates logic from UI for future online support.
 
-- **Planned Expansions**: The project’s architecture is modular, allowing future additions such as an expanded shop with items or quests, online multiplayer and trading (scaffolded), and social features. These are not yet implemented in the current version.
-
-## Screenshot Showcase
-
-### Welcome Screen
-
-The entry screen of Pyokemon TCG greets players with a stylized Pokémon-themed background and title. This interface is built with PyGame and `pygame-gui`, featuring an animated backdrop and a “Press Start” prompt to proceed into the login/registration flow.
-
-### Login & Registration Screens
-
-The login interface includes fields for username and password, with input validation and user feedback. If the user doesn’t have an account, they can switch to the registration form which ensures unique usernames and password confirmation. User data is saved to a local SQLite database.
-
-### Main Interface (Home)
-
-After logging in, players arrive at the home screen, featuring a top navigation bar, a dynamic content area, and quick-access widgets (e.g., card packs, store, tips). The persistent bottom navigation bar highlights the current section. The UI uses translucent panels and responsive layouts.
-
-### Card Pack Opening
-
-When a player acquires a booster pack, they can open it with an interactive animation. The contents are revealed randomly with visual effects. The background dims to focus attention, enhancing the excitement of discovery.
-
-### Collection – Pokédex
-
-Displays all cards in the game, highlighting collected ones. Filters are available by collected status, rarity, or type. Card images are cached for performance, and a progress indicator shows collection progress.
-
-### Card Data Fetcher Tool
-
-A Tkinter-based developer GUI that fetches card data from the Pokémon TCG API. The user configures how many cards to generate and where to save them. The tool saves JSON metadata and images locally for offline use.
+- **Future Expansion**: Thanks to its modular design, Pyokemon TCG is ready for future features like shop expansion (items, quests, unlockables), online modes (PvP, trading – already stubbed), and social features (friends list, chat). These are not yet implemented, but architectural hooks are in place.
 
 ## Installation & Dependencies
 
-**Requirements**: Python 3.10 or higher is required. Use a virtual environment if possible. Install dependencies via:
+**Environment**: Requires Python 3.10 or later. It is recommended to use a virtual environment to avoid interfering with system-wide packages. The project depends on the following third-party libraries:
+
+***Due to dependency conflicts between `pygame-gui` and `pygame-cards`, do NOT install using `pip install -r requirements.txt`. This file is for reference only.***
+
+***If unsure how to resolve conflicts, use the [Windows Startup Tool](install_env_start_windows.bat) or [Linux Startup Tool](install_env_start_linux.sh) for setup and launching.***
+
+**Key Dependencies**:
+
+- **pygame** – Core 2D game engine for window handling, event processing, and basic rendering.
+- **pygame-gui** – GUI framework built on PyGame, used for interface components like buttons, input boxes, dropdowns.
+- **pygame-cards** – A third-party library for card display and interactions such as dragging and flipping; used in battle interface.
+- **requests** – For HTTP communication with the Pokémon TCG API.
+- **Pillow (PIL)** – Image processing library for resizing and format conversion.
+
+**Install Environment**:
+
+- [Windows Startup Tool](install_env_start_windows.bat)
+- [Linux Startup Tool](install_env_start_linux.sh)
+
+**Additional Dev Libraries**:
+
+- `tkinter` – For the fetcher GUI (built-in)
+- `opencv-python` – Image processing (for dev tools)
+- `graphviz` – Generates directory trees
+- `tqdm` – Console progress bars
+
+**SQLite**: Built-in with Python.
+
+**Using Developer Tools**:
+
+To update card data or for teaching purposes, use the card crawler in `development/fetch_card/`. Launch the GUI with:
+
+```bash
+python development/fetch_card/fetch_card_gui.py
+```
+
+Set parameters like target card count and output folder, then click start. The tool fetches card data from the API and saves it to `card_assets/cards.json` and card images to `card_assets/images/`. Ensure the game is not running during this update. Typically, one import is sufficient for offline play.
+
+Other dev scripts (directory tree generator, system font checks, card image tools) can be run manually for development insight. Players do not need these for normal gameplay.
+
+## Project Structure
+
+The project is organized by functionality, separating game logic, assets, and dev tools. Core structure:
+
+- `game/`: Main logic including auth, database, battles.
 
 ```
-pip install -r requirements.txt
+game/
+├── core/        # Core modules (Auth, DB, Battle, etc.)
+├── scenes/      # Scene definitions (Login, Home, Pokédex, Battle)
+│   ├── login_scene.py
+│   ├── dex_page.py
+│   └── battle_page.py
+├── ui/          # Reusable UI components
+│   ├── navigation_bar/
+│   └── battle_interface/
+├── utils/
+│   └── video_background.py
+```
+- `assets/`: Media resources for the game.
+
+```
+assets/
+├── images/     # Backgrounds, card art, etc.
+├── icons/      # UI icons
+├── fonts/      # Font files
+├── sounds/     # SFX and music
+├── videos/     # Cutscenes
+├── json/       # Image data
 ```
 
-### Key Libraries:
+- `data/`: Local data including user saves.
 
-- `pygame` – game rendering and loop  
-- `pygame-gui` – GUI widgets  
-- `pygame-cards` – visual card handling (in battle)  
-- `requests` – API fetching  
-- `Pillow` – image processing  
-- `sqlite3` – local database (builtin)  
-- `tkinter` – card import GUI (builtin)  
-- `opencv-python`, `graphviz`, `tqdm` – used in dev tools  
+```
+data/
+├── game_database.db  # SQLite database
+├── cards.json        # Card data (from fetcher)
+└── cache/            # Cached scaled images
+```
 
-Make sure your environment supports a GUI display (PyGame window). No special setup needed for Windows/Mac/Linux beyond installing dependencies.
+- `development/`: Dev tools, optional for players.
+
+```
+development/
+├── fetch_card/             # Card fetching tool
+├── generate_tree.py        # Directory tree generator
+├── directory_tree.txt      # Text version of structure
+├── directory_tree.png      # Visual version
+└── ...                     # Other dev tools
+```
+
+- Root Files: Includes `main.py` (entry point), `requirements.txt`, `README.md`, etc. For full file structure, see `development/directory_tree.txt`.
 
 ## How to Run
 
-Run the main game with:
+To start the main program:
 
 ```
 python main.py
 ```
 
-To run the card import GUI:
+To run the card fetcher:
 
 ```
 python development/fetch_card/fetch_card_gui.py
 ```
 
-This opens a Tkinter GUI that fetches and caches card data from the API for offline use.
-
-## Project Structure
-
-```
-├── main.py
-├── requirements.txt
-├── README.md
-├── game/
-│   ├── core/         # Game logic, backend, auth, database
-│   ├── scenes/       # Screens: login, home, pokedex, battle, etc.
-│   ├── ui/           # Reusable UI elements
-│   └── utils/        # Utilities and helpers
-├── assets/           # Images, sounds, fonts
-├── data/             # SQLite DB, card data, cache
-├── development/
-│   ├── fetch_card/   # Card data fetch tool (GUI)
-│   ├── generate_tree.py
-│   └── ...
-└── docs/             # Design notes, diagrams, etc.
-```
-
-- `game/` contains modular game code by function.  
-- `assets/` holds static media (backgrounds, cards, UI).  
-- `data/` stores persistent progress and card data.  
-- `development/` includes tools for devs (e.g. card fetcher).  
-- `main.py` is the entry point.
+This tool fetches from the Pokémon TCG API and stores data in card_assets/cards.json and image folder.
 
 ## Development Background & License
 
-This project was developed as a final academic project to demonstrate software development and Python game techniques. It is **unofficial**, **non-commercial**, and intended purely for **learning and fun**.
+**Development Background**: Pyokemon TCG was created as a teaching exercise and graduation project over roughly 10 weeks. The goal was to explore building a small game using Python in a non-commercial context. It incorporates MVC architecture, modular code, API usage, and SQLite storage — ideal as a learning reference. During development, the interface and structure were refactored several times for performance and maintainability, including switching to `pygame-gui`, integrating `pygame-cards`, and adding various dev tools. The result is a playable TCG prototype and a chronicle of the developer’s learning journey. It’s a great example for anyone interested in Python and game development.
 
-It is not affiliated with or endorsed by Nintendo, The Pokémon Company, or Wizards of the Coast. All Pokémon assets remain their intellectual property and are used here under **fair use** for educational purposes only.
+**License Disclaimer**: This is an open-source, non-commercial project intended for educational and personal entertainment purposes only. All Pokémon-related images, names, and materials belong to Nintendo, The Pokémon Company, and respective rights holders. This project imitates these materials strictly for learning and does not constitute infringement or commercial use. Do not use any part of this project for commercial purposes or unauthorized redistribution. In short, Pyokemon TCG is for learning only — commercial use is prohibited. The author welcomes others to study and reference the code, but please credit the source and ensure lawful usage.
 
-**License**: Open-source for personal and educational use. **Commercial use is strictly prohibited.**
-
----
-
-**Happy coding, and enjoy exploring the world of Pokémon TCG through this Python project!**
+This project does not include a formal license and is considered educational-use only. You may modify or extend the code following the above principles. The author provides no commercial support or warranties. Pokémon images and data are used for practice purposes only; all rights remain with their original owners.

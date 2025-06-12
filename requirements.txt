@@ -1,6 +1,6 @@
 pygame
-pygame_gui
-pygamecards
+pygame-gui
+pygame-cards
 # Existe un conflicto de dependencias; es necesario seguir estrictamente el orden de instalación indicado en el archivo README.md.
 
 requests

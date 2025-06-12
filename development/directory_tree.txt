@@ -1,15 +1,21 @@
 project_root/
+├── Main.py
 ├── README.md
+├── README_CN.md
+├── README_EN.md
+├── assets/
+│   ├── audio/
+│   └── videos/
+│       ├── bg.mp4
+│       └── pika.mp4
 ├── cache_info.txt
 ├── cache_version.txt
 ├── card_assets/
 │   └── cards.json
-├── config/
-│   └── __init__.py
 ├── data/
 │   ├── backup/
 │   └── game_database.db
-├── docs/
+├── disabled/
 ├── game/
 │   ├── __init__.py
 │   ├── core/
@@ -27,10 +33,10 @@ project_root/
 │   │   │   ├── battle_state.py
 │   │   │   ├── player_state.py
 │   │   │   ├── pokemon_instance.py
-│   │   │   ├── synchronized_battle_controller.py
-│   │   │   └── test_battle.py
+│   │   │   └── synchronized_battle_controller.py
 │   │   ├── cards/
 │   │   │   ├── card_data.py
+│   │   │   ├── card_manager.py.disabled
 │   │   │   └── collection_manager.py
 │   │   ├── database/
 │   │   │   ├── __init__.py
@@ -70,34 +76,17 @@ project_root/
 │   │       ├── __init__.py
 │   │       ├── battle/
 │   │       │   ├── __init__.py
-│   │       │   ├── battle_interface/
-│   │       │   │   ├── __init__.py
-│   │       │   │   ├── action_panel.py
-│   │       │   │   ├── battle_ui.py
-│   │       │   │   └── field_display.py
-│   │       │   ├── battle_prep/
-│   │       │   │   ├── __init__.py
-│   │       │   │   ├── battle_prep_window.py
-│   │       │   │   ├── deck_chooser.py
-│   │       │   │   └── mode_selector.py
-│   │       │   └── deck_builder/
+│   │       │   └── battle_prep/
 │   │       │       ├── __init__.py
-│   │       │       ├── card_selector.py
-│   │       │       ├── deck_builder_window.py
-│   │       │       └── deck_slot_manager.py
-│   │       ├── e_magica.py
+│   │       │       └── battle_prep_window.py
 │   │       ├── package/
 │   │       │   ├── __init__.py
-│   │       │   ├── pack_opening_window.py
-│   │       │   └── test_pack_window.py
+│   │       │   └── pack_opening_window.py
 │   │       └── tienda/
 │   │           ├── __init__.py
-│   │           ├── testtienda.py
 │   │           ├── themed_window.py
-│   │           ├── tienda_draw.py
-│   │           ├── tienda_draw.py.backup
+│   │           ├── tienda_draw.py.disabled
 │   │           ├── tienda_modern.py
-│   │           ├── tienda_modern.py.backup
 │   │           └── tienda_theme.json
 │   ├── ui/
 │   │   ├── __init__.py
@@ -107,14 +96,14 @@ project_root/
 │   │   │       ├── __init__.py
 │   │   │       ├── battle_cache.py
 │   │   │       ├── battle_interface.py
-│   │   │       ├── new_battle_interface.py
 │   │   │       └── pokemon_card_adapter.py
 │   │   └── navigation_bar/
 │   │       ├── __init__.py
 │   │       └── pokemon_navigation_bar.py
 │   └── utils/
 │       ├── __init__.py
-│       ├── load_font.py
 │       └── video_background.py
-├── main.py
-└── requirements.txt
+├── install_env_start_linux.sh
+├── install_env_start_windows.bat
+├── requirements.txt
+└── tests/
