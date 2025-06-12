@@ -6,6 +6,7 @@ import math
 import os
 import sys
 import random
+import traceback
 from typing import Optional, Callable
 from game.core.database.database_manager import DatabaseManager
 
@@ -20,7 +21,7 @@ except ImportError:
 # 导入窗口类
 try:
     # from game.scenes.windows.package import PackageWindow
-    from game.scenes.windows.e_magica import EMagicaWindow
+    # from game.scenes.windows.e_magica import EMagicaWindow
     from game.scenes.windows.tienda.tienda_modern import ModernTiendaWindow
     from game.scenes.windows.package.pack_opening_window import PackOpeningWindow
 
@@ -706,16 +707,16 @@ class HomePage:
             self.active_windows['e_magica'].close()
         
         # 创建新的魔法窗口
-        try:
-            self.active_windows['e_magica'] = EMagicaWindow(
-                self.screen_width, 
-                self.screen_height, 
-                self.ui_manager
-            )
-            self.active_windows['e_magica'].on_close = lambda: self.close_window('e_magica')
-            print("✨ 显示魔法选择窗口")
-        except Exception as e:
-            print(f"❌ 创建魔法选择窗口失败: {e}")
+        # try:
+        #     self.active_windows['e_magica'] = EMagicaWindow(
+        #         self.screen_width, 
+        #         self.screen_height, 
+        #         self.ui_manager
+        #     )
+        #     self.active_windows['e_magica'].on_close = lambda: self.close_window('e_magica')
+        #     print("✨ 显示魔法选择窗口")
+        # except Exception as e:
+        #     print(f"❌ 创建魔法选择窗口失败: {e}")
     
     # def show_tienda_window(self):
     #     """显示商店窗口"""
@@ -759,6 +760,8 @@ class HomePage:
             print("🛍️ 显示现代化商店窗口")
         except Exception as e:
             print(f"❌ 创建现代化商店窗口失败: {e}")
+            full_trace = traceback.format_exc()
+            print("错误信息：", full_trace)
     
     # def close_window(self, window_name: str):
     #     """关闭指定窗口"""

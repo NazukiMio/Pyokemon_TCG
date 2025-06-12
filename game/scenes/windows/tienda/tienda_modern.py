@@ -18,8 +18,8 @@ from game.scenes.windows.tienda.themed_window import ThemedUIWindow, ShopWindow
 
 # 导入管理系统
 from game.core.database.database_manager import DatabaseManager
-from game.scenes.styles.theme import Theme
-from game.scenes.styles.fonts import font_manager
+# from game.scenes.styles.theme import Theme
+# from game.scenes.styles.fonts import font_manager
 
 
 class ModernTiendaWindow:

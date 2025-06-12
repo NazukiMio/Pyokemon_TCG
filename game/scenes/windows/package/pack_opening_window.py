@@ -9,7 +9,7 @@ from enum import Enum
 
 # 导入字体管理器
 try:
-    from game.scenes.styles.fonts import font_manager
+    from game.scenes.styles import fonts
     FONT_MANAGER_AVAILABLE = True
     print("✅ 字体管理器导入成功")
 except ImportError:
@@ -136,6 +136,9 @@ class PackOpeningWindow:
         self.packet_images = []  # 存储所有packet图片
         self.current_packet_image = None 
         self.obtained_cards = []
+
+        # 初始化字体
+        fonts.font_manager = fonts.FontManager()
         
         # 动画效果参数
         self.circle_rotation = 0.0
@@ -332,10 +335,10 @@ class PackOpeningWindow:
         if FONT_MANAGER_AVAILABLE:
             try:
                 # 使用字体管理器获取开包专用字体
-                self.fonts = font_manager.get_pack_fonts(self.screen_height)
+                self.fonts = fonts.font_manager.get_pack_fonts(self.screen_height)
                 # 添加智能渲染方法的引用
-                self.render_text_smart = font_manager.render_text_smart
-                self.get_text_size_smart = font_manager.get_text_size_smart
+                self.render_text_smart = fonts.font_manager.render_text_smart
+                self.get_text_size_smart = fonts.font_manager.get_text_size_smart
                 print("✅ 开包窗口智能字体系统加载成功")
             except Exception as e:
                 print(f"❌ 字体管理器加载失败: {e}")
