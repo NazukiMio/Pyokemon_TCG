@@ -397,17 +397,19 @@ class DexPage:
                 else:
                     print("Uso la cache existente (v{self._cached_version})")
                 
-                # 🆕 无论版本是否变化，都要确保有卡牌数据
+                # Asegúrese de que haya datos de la tarjeta
                 self.all_cards = self.game_manager.get_cached_cards()
             else:
-                print("⚠️ GameManager不可用")
+                print("GameManager no está disponible")
                 self.all_cards = []
         except Exception as e:
-            print(f"❌ 加载卡牌数据失败: {e}")
+            print(f"Cargar datos de las cartas falló: {e}")
             self.all_cards = []
         
         self.total_cards = len(self.all_cards)
-        print(f"📊 最终加载: {self.total_cards} 张卡牌")  # 🆕 确认数据加载
+        print(f"📊 Finalmente cargado: {self.total_cards} cartas")  # Confirmar que se cargaron las cartas
+
+    
     
     # def _load_user_collection(self):
     #     """加载用户收集数据"""
